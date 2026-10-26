@@ -129,7 +129,7 @@
         @forelse ($prestamo->pagos->sortByDesc('id') as $pg)
             <div class="d-flex justify-content-between align-items-center py-2 {{ ! $loop->last ? 'border-bottom' : '' }}">
                 <div><strong>${{ number_format($pg->valor, 0, ',', '.') }}</strong>
-                    <div class="small text-secondary">{{ $pg->fecha->format('d/m/Y') }} · {{ $pg->user->name }}{{ $pg->nota ? ' · '.$pg->nota : '' }}</div>
+                    <div class="small text-secondary">{{ $pg->fecha->format('d/m/Y') }} · {{ $pg->created_at->format('h:i a') }} · {{ $pg->user->name }}{{ $pg->nota ? ' · '.$pg->nota : '' }}</div>
                     @if ($pg->renovacion)<span class="badge badge-soft-primary"><i class="bi bi-arrow-repeat"></i> Renovación (sin efectivo)</span>@endif</div>
                 @if ($prestamo->estado !== 'anulado' && ! $pg->renovacion)
                     <form method="POST" action="{{ route('pagos.destroy', $pg) }}" data-motivo="¿Por qué deshaces este pago de ${{ number_format($pg->valor, 0, ',', '.') }}?">

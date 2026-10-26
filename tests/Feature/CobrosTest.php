@@ -649,4 +649,14 @@ class CobrosTest extends TestCase
         $this->actingAs($empresa)->get(route('auditoria.index'))->assertOk()
             ->assertSee('Cambio del cobrador propio')->assertDontSee('Cambio de otra empresa');
     }
+
+    public function test_el_historial_de_pagos_muestra_la_hora_del_registro(): void
+    {
+        $this->travelTo(now()->setTime(15, 42));
+        $u = $this->cobrador();
+        $p = $this->prestamo($u);
+        app(PagoService::class)->aplicar($p, 12000, today()->toDateString(), $u->id);
+
+        $this->actingAs($u)->get(route('prestamos.show', $p->id))->assertOk()->assertSee('03:42 pm');
+    }
 }
