@@ -111,7 +111,7 @@ class CobrosTest extends TestCase
         $this->assertSame('pagado', $p->fresh()->estado);
 
         $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
-            'valor_cuota' => 15000, 'num_cuotas' => 8, 'fecha_inicio' => today()->addDay()->toDateString(),
+            'monto' => 120000, 'valor_cuota' => 15000, 'num_cuotas' => 8, 'fecha_inicio' => today()->addDay()->toDateString(),
         ])->assertRedirect();
 
         $nuevo = Prestamo::where('cliente_id', $p->cliente_id)->where('id', '!=', $p->id)->firstOrFail();
@@ -130,7 +130,7 @@ class CobrosTest extends TestCase
         app(PagoService::class)->aplicar($p, 84000, today()->toDateString(), $u->id); // 7 de 10 → saldo 36.000
 
         $r = app(PrestamoService::class)->renovar($p->fresh(), [
-            'valor_cuota' => 15000, 'num_cuotas' => 8, 'fecha_inicio' => today()->addDay()->toDateString(),
+            'monto' => 120000, 'valor_cuota' => 15000, 'num_cuotas' => 8, 'fecha_inicio' => today()->addDay()->toDateString(),
         ], $u->id);
 
         $this->assertSame(36000.0, $r['saldo']);
@@ -157,7 +157,7 @@ class CobrosTest extends TestCase
         $p = $this->prestamo($u);
 
         $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
-            'valor_cuota' => 1000, 'num_cuotas' => 2, 'fecha_inicio' => today()->addDay()->toDateString(),
+            'monto' => 2000, 'valor_cuota' => 1000, 'num_cuotas' => 2, 'fecha_inicio' => today()->addDay()->toDateString(),
         ])->assertSessionHasErrors('valor_cuota');
 
         $this->assertSame('activo', $p->fresh()->estado);
@@ -171,7 +171,7 @@ class CobrosTest extends TestCase
         app(PagoService::class)->aplicar($p, 84000, today()->toDateString(), $u->id); // caja 84.000
 
         app(PrestamoService::class)->renovar($p->fresh(), [
-            'valor_cuota' => 15000, 'num_cuotas' => 8, 'fecha_inicio' => today()->addDay()->toDateString(),
+            'monto' => 120000, 'valor_cuota' => 15000, 'num_cuotas' => 8, 'fecha_inicio' => today()->addDay()->toDateString(),
         ], $u->id);
 
         // 120k base + 84k cobrado + 36k renovación − 120k − 120k nuevo = 0 → entregó 84.000 en efectivo
@@ -438,7 +438,7 @@ class CobrosTest extends TestCase
         app(PrestamoService::class)->anular($anulado);
 
         $renovado = app(PrestamoService::class)->renovar($activo->fresh(), [
-            'valor_cuota' => 20000, 'num_cuotas' => 6, 'fecha_inicio' => today()->addDay()->toDateString(),
+            'monto' => 120000, 'valor_cuota' => 20000, 'num_cuotas' => 6, 'fecha_inicio' => today()->addDay()->toDateString(),
         ], $u->id)['prestamo'];
 
         foreach ([$activo, $pagado, $anulado, $renovado] as $p) {
@@ -491,5 +491,51 @@ class CobrosTest extends TestCase
         $this->actingAs($u)->post(route('clientes.store'), ['nombres' => 'Segundo']);
 
         $this->assertSame([1, 2], Cliente::orderBy('id')->pluck('orden')->all());
+    }
+
+    public function test_renovar_con_monto_editable_recalcula_cuota_y_resta_el_saldo(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u, ['fecha_inicio' => today()->subDays(2)->toDateString(), 'saltar_domingos' => false]);
+        app(PagoService::class)->aplicar($p, 84000, today()->toDateString(), $u->id); // saldo 36.000
+
+        // Nuevo monto 100.000 en 4 cuotas de 25.000: se entregan 64.000
+        $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
+            'monto' => 100000, 'valor_cuota' => 25000, 'num_cuotas' => 4, 'fecha_inicio' => today()->addDay()->toDateString(),
+        ])->assertRedirect()->assertSessionHas('ok');
+
+        $nuevo = Prestamo::where('renovado_de_id', $p->id)->firstOrFail();
+        $this->assertSame(100000.0, (float) $nuevo->monto_total);
+        $this->assertSame(4, $nuevo->cuotas()->count());
+        $this->assertSame(100000.0, (float) $nuevo->cuotas()->sum('valor'));
+        $this->assertSame(36000.0, (float) $p->pagos()->where('renovacion', true)->sum('valor'));
+        $this->assertStringContainsString('64.000', session('ok'));
+    }
+
+    public function test_renovar_con_monto_que_no_cuadra_con_la_cuota_se_rechaza(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u);
+
+        $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
+            'monto' => 500000, 'valor_cuota' => 10000, 'num_cuotas' => 4, 'fecha_inicio' => today()->addDay()->toDateString(),
+        ])->assertSessionHasErrors('monto');
+
+        $this->assertSame(1, Prestamo::count());
+    }
+
+    public function test_monto_con_redondeo_la_ultima_cuota_ajusta(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u);
+        app(PagoService::class)->aplicar($p, 120000, today()->toDateString(), $u->id);
+
+        // 100.000 en 3 cuotas: 33.333 + 33.333 + 33.334
+        $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
+            'monto' => 100000, 'valor_cuota' => 33333, 'num_cuotas' => 3, 'fecha_inicio' => today()->addDay()->toDateString(),
+        ])->assertRedirect();
+
+        $nuevo = Prestamo::where('renovado_de_id', $p->id)->firstOrFail();
+        $this->assertSame([33333.0, 33333.0, 33334.0], $nuevo->cuotas->map(fn ($c) => (float) $c->valor)->all());
     }
 }

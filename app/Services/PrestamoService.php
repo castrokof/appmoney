@@ -22,15 +22,16 @@ class PrestamoService
 
     /**
      * Crea el préstamo y sus cuotas en una transacción.
-     * El monto del préstamo es valor_cuota × num_cuotas.
-     * $data: user_id, cliente_id, valor_cuota, num_cuotas, frecuencia,
+     * El monto del préstamo es valor_cuota × num_cuotas (o `monto` si se envía; la última cuota ajusta el redondeo).
+     * $data: user_id, cliente_id, valor_cuota, num_cuotas, monto?, frecuencia,
      *        saltar_domingos?, saltar_festivos?, fecha_inicio
      */
     public function crear(array $data): Prestamo
     {
         $n = (int) $data['num_cuotas'];
         $valorCuota = (float) $data['valor_cuota'];
-        $monto = $this->total($valorCuota, $n);
+        // Normalmente cuota × n.º de cuotas; en una renovación el monto puede fijarse a mano
+        $monto = isset($data['monto']) ? round((float) $data['monto'], 2) : $this->total($valorCuota, $n);
 
         if (config('cobros.usar_base') && config('cobros.bloquear_sin_base')) {
             $disponible = $this->caja->caja((int) $data['user_id']);
@@ -105,7 +106,8 @@ class PrestamoService
     /**
      * Renueva un préstamo (pagado o con cuotas pendientes). El saldo pendiente del anterior se cancela
      * con el nuevo préstamo y al cliente se le entrega la diferencia (nuevo monto − saldo).
-     * $data: valor_cuota, num_cuotas, fecha_inicio. Hereda cliente, frecuencia y opciones de fechas.
+     * $data: monto (lo que se vuelve a prestar), valor_cuota, num_cuotas, fecha_inicio.
+     * Hereda cliente, frecuencia y opciones de fechas.
      *
      * @return array{prestamo: Prestamo, saldo: float, entregar: float}
      */
@@ -119,7 +121,7 @@ class PrestamoService
             }
 
             $saldo = round((float) $anterior->cuotas()->sum(DB::raw('valor - pagado')), 2);
-            $nuevoMonto = $this->total((float) $data['valor_cuota'], (int) $data['num_cuotas']);
+            $nuevoMonto = round((float) $data['monto'], 2);
 
             if ($nuevoMonto < $saldo) {
                 throw ValidationException::withMessages([

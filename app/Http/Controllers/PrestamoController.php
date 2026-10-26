@@ -105,10 +105,16 @@ class PrestamoController extends Controller
         abort_unless(in_array($anterior->estado, ['activo', 'pagado'], true), 422, 'Este préstamo no se puede renovar.');
 
         $data = $request->validate([
+            'monto' => 'required|numeric|min:1|max:9999999999',
             'valor_cuota' => 'required|numeric|min:1|max:999999999',
             'num_cuotas' => 'required|integer|min:1|max:520',
             'fecha_inicio' => 'required|date',
         ]);
+
+        // El monto y la cuota deben cuadrar (la diferencia es solo el redondeo de la cuota)
+        if (abs((float) $data['monto'] - (float) $data['valor_cuota'] * (int) $data['num_cuotas']) > (int) $data['num_cuotas']) {
+            return back()->withErrors(['monto' => 'El monto no coincide con valor de la cuota × número de cuotas.'])->withInput();
+        }
 
         $r = $service->renovar($anterior, $data, $request->user()->id);
 
