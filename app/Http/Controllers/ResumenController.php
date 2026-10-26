@@ -20,7 +20,7 @@ class ResumenController extends Controller
         $hasta = $request->query('hasta', today()->toDateString());
         $ids = $this->userIds();
 
-        $porDia = Pago::whereIn('user_id', $ids)->whereBetween('fecha', [$desde, $hasta])
+        $porDia = Pago::whereIn('user_id', $ids)->where('renovacion', false)->whereBetween('fecha', [$desde, $hasta])
             ->selectRaw('fecha, SUM(valor) as total, COUNT(*) as pagos')
             ->groupBy('fecha')->orderByDesc('fecha')->get();
 
@@ -33,7 +33,7 @@ class ResumenController extends Controller
             ->where('fecha', '<', today()->toDateString())->sum(\DB::raw('valor - pagado'));
 
         $cobradoresRows = $this->usuariosVisibles()->map(function ($u) use ($caja, $desde, $hasta) {
-            $cobradoPer = (float) Pago::where('user_id', $u->id)->whereBetween('fecha', [$desde, $hasta])->sum('valor');
+            $cobradoPer = (float) Pago::where('user_id', $u->id)->where('renovacion', false)->whereBetween('fecha', [$desde, $hasta])->sum('valor');
 
             return ['usuario' => $u, 'cobrado_periodo' => $cobradoPer] + $caja->desglose($u->id);
         });

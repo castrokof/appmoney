@@ -15,6 +15,7 @@
         <div><strong>Préstamo:</strong> ${{ number_format($prestamo->monto_total, 0, ',', '.') }} = {{ $prestamo->num_cuotas }} cuotas de ${{ number_format($prestamo->valor_cuota, 0, ',', '.') }} {{ $prestamo->frecuencia }}s desde {{ $prestamo->fecha_inicio->format('d/m/Y') }}</div>
         <div><strong>Calificación del cliente:</strong> @include('partials.calificacion', ['cal' => $cal])
             @if ($cal['atrasadas'] > 0)<span class="text-danger">· {{ $cal['atrasadas'] }} cuota(s) atrasada(s), la más vieja hace {{ $cal['dias_max'] }} día(s)</span>@endif</div>
+        @if ($prestamo->renovado_de_id)<div><strong>Renovación del préstamo</strong> <a href="{{ route('prestamos.show', $prestamo->renovado_de_id) }}">#{{ $prestamo->renovado_de_id }}</a></div>@endif
         <div><strong>Cobrador:</strong> {{ $prestamo->user->name }} · <strong>Tel:</strong> {{ $prestamo->cliente->telefono ?: '—' }}</div>
         @if ($prestamo->estado === 'activo')
             <div class="d-flex gap-2 mt-3">
@@ -26,14 +27,14 @@
                 </form>
             </div>
         @endif
-        @if ($prestamo->estado === 'pagado')
+        @if (in_array($prestamo->estado, ['activo', 'pagado'], true))
             <button class="btn btn-primary btn-cobrar w-100 mt-3" data-bs-toggle="modal" data-bs-target="#modalRenovar">
                 <i class="bi bi-arrow-repeat"></i> Renovar préstamo
             </button>
         @endif
     </div></div>
 
-    @if ($prestamo->estado === 'pagado')
+    @if (in_array($prestamo->estado, ['activo', 'pagado'], true))
     <div class="modal fade" id="modalRenovar" tabindex="-1"><div class="modal-dialog modal-dialog-centered">
         <form method="POST" action="{{ route('prestamos.renovar', $prestamo->id) }}" class="modal-content">
             @csrf
@@ -41,6 +42,9 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <p class="small text-secondary">Se crea un préstamo nuevo para {{ $prestamo->cliente->nombre_completo }} con las mismas condiciones ({{ $prestamo->frecuencia }}{{ $prestamo->saltar_domingos ? ', sin domingos' : '' }}{{ $prestamo->saltar_festivos ? ', sin festivos' : '' }}). Puedes ajustar los valores.</p>
+                @if ($prestamo->saldo_calc > 0)
+                    <div class="alert alert-warning py-2 small">Este préstamo aún tiene <strong>${{ number_format($prestamo->saldo_calc, 0, ',', '.') }}</strong> pendientes. Se descuentan del nuevo préstamo y al cliente se le entrega la diferencia.</div>
+                @endif
                 <div class="row g-2">
                     <div class="col-6"><label class="form-label fw-semibold">Valor de la cuota</label>
                         <input name="valor_cuota" id="rCuota" type="number" step="any" min="1" class="form-control form-control-lg" required value="{{ (float) $prestamo->valor_cuota }}"></div>
@@ -49,18 +53,31 @@
                     <div class="col-12"><label class="form-label fw-semibold">Primera cuota</label>
                         <input name="fecha_inicio" type="date" class="form-control" required value="{{ today()->addDay()->toDateString() }}"></div>
                 </div>
-                <div class="rounded-4 p-3 mt-3 text-white text-center" style="background:var(--brand-grad)">
-                    <div class="small opacity-75">Monto del nuevo préstamo</div><div class="fs-4 fw-bold" id="rTotal">$0</div>
+                <div class="rounded-4 p-3 mt-3 text-white" style="background:var(--brand-grad)">
+                    <div class="d-flex justify-content-between"><span class="opacity-75">Monto del nuevo préstamo</span><strong id="rTotal">$0</strong></div>
+                    <div class="d-flex justify-content-between"><span class="opacity-75">− Saldo pendiente actual</span><strong id="rSaldo">$0</strong></div>
+                    <hr class="my-2 opacity-50">
+                    <div class="d-flex justify-content-between fs-5"><span>Entregar al cliente</span><strong id="rEntregar">$0</strong></div>
                 </div>
+                <div class="text-danger small mt-2 d-none" id="rError">El nuevo préstamo debe cubrir el saldo pendiente.</div>
             </div>
-            <div class="modal-footer border-0 pt-0"><button class="btn btn-success btn-lg w-100 fw-bold">Renovar ahora</button></div>
+            <div class="modal-footer border-0 pt-0"><button class="btn btn-success btn-lg w-100 fw-bold" id="rBtn">Renovar ahora</button></div>
         </form>
     </div></div>
     @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const f = () => document.getElementById('rTotal').textContent =
-                money((parseFloat(document.getElementById('rCuota').value) || 0) * (parseInt(document.getElementById('rN').value) || 0));
+            const saldo = {{ (float) $prestamo->saldo_calc }};
+            const $ = (id) => document.getElementById(id);
+            const f = () => {
+                const nuevo = (parseFloat($('rCuota').value) || 0) * (parseInt($('rN').value) || 0);
+                $('rTotal').textContent = money(nuevo);
+                $('rSaldo').textContent = money(saldo);
+                $('rEntregar').textContent = money(nuevo - saldo);
+                const corto = nuevo < saldo;
+                $('rError').classList.toggle('d-none', !corto);
+                $('rBtn').disabled = corto;
+            };
             ['rCuota', 'rN'].forEach(id => document.getElementById(id).addEventListener('input', f));
             f();
         });
@@ -96,8 +113,9 @@
         @forelse ($prestamo->pagos->sortByDesc('id') as $pg)
             <div class="d-flex justify-content-between align-items-center py-2 {{ ! $loop->last ? 'border-bottom' : '' }}">
                 <div><strong>${{ number_format($pg->valor, 0, ',', '.') }}</strong>
-                    <div class="small text-secondary">{{ $pg->fecha->format('d/m/Y') }} · {{ $pg->user->name }}{{ $pg->nota ? ' · '.$pg->nota : '' }}</div></div>
-                @if ($prestamo->estado !== 'anulado')
+                    <div class="small text-secondary">{{ $pg->fecha->format('d/m/Y') }} · {{ $pg->user->name }}{{ $pg->nota ? ' · '.$pg->nota : '' }}</div>
+                    @if ($pg->renovacion)<span class="badge badge-soft-primary"><i class="bi bi-arrow-repeat"></i> Renovación (sin efectivo)</span>@endif</div>
+                @if ($prestamo->estado !== 'anulado' && ! $pg->renovacion)
                     <form method="POST" action="{{ route('pagos.destroy', $pg) }}" onsubmit="return confirm('¿Deshacer este pago?')">
                         @csrf @method('DELETE') <button class="btn btn-sm btn-outline-danger rounded-pill">Deshacer</button>
                     </form>

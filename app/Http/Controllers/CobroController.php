@@ -23,7 +23,7 @@ class CobroController extends Controller
             ->values();
 
         $porCobrar = $prestamos->sum('hoy_calc');
-        $cobradoHoy = (float) Pago::whereIn('user_id', $this->userIds())->whereDate('fecha', $hoy)->sum('valor');
+        $cobradoHoy = (float) Pago::whereIn('user_id', $this->userIds())->where('renovacion', false)->whereDate('fecha', $hoy)->sum('valor');
         $cajaTotal = config('cobros.usar_base') ? collect($this->userIds())->sum(fn ($id) => $caja->caja($id)) : null;
         $atrasadoTotal = $prestamos->sum('atrasado_calc');
 

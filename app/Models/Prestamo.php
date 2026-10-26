@@ -12,7 +12,7 @@ class Prestamo extends Model
 
     protected $fillable = [
         'user_id', 'cliente_id', 'monto', 'interes_pct', 'monto_total',
-        'num_cuotas', 'valor_cuota', 'frecuencia', 'saltar_domingos', 'saltar_festivos', 'fecha_inicio', 'estado',
+        'num_cuotas', 'valor_cuota', 'frecuencia', 'saltar_domingos', 'saltar_festivos', 'fecha_inicio', 'estado', 'renovado_de_id',
     ];
 
     protected $casts = [

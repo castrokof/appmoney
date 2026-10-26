@@ -103,15 +103,10 @@ class CobrosTest extends TestCase
         $this->assertSame(['2026-01-01', '2026-01-08'], $g->cuotas->map(fn ($c) => $c->fecha->toDateString())->all());
     }
 
-    public function test_renovar_solo_prestamos_pagados_y_copia_condiciones(): void
+    public function test_renovar_prestamo_pagado_copia_condiciones(): void
     {
         $u = $this->cobrador();
         $p = $this->prestamo($u, ['saltar_festivos' => true]);
-
-        $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
-            'valor_cuota' => 12000, 'num_cuotas' => 10, 'fecha_inicio' => today()->addDay()->toDateString(),
-        ])->assertStatus(422); // sigue activo
-
         app(PagoService::class)->aplicar($p, 120000, today()->toDateString(), $u->id);
         $this->assertSame('pagado', $p->fresh()->estado);
 
@@ -125,6 +120,62 @@ class CobrosTest extends TestCase
         $this->assertSame('diario', $nuevo->frecuencia);
         $this->assertTrue($nuevo->saltar_festivos);
         $this->assertCount(8, $nuevo->cuotas);
+        $this->assertSame($p->id, $nuevo->renovado_de_id);
+    }
+
+    public function test_renovar_con_cuotas_pendientes_descuenta_saldo_y_entrega_la_diferencia(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u, ['fecha_inicio' => today()->subDays(2)->toDateString(), 'saltar_domingos' => false]);
+        app(PagoService::class)->aplicar($p, 84000, today()->toDateString(), $u->id); // 7 de 10 → saldo 36.000
+
+        $r = app(PrestamoService::class)->renovar($p->fresh(), [
+            'valor_cuota' => 15000, 'num_cuotas' => 8, 'fecha_inicio' => today()->addDay()->toDateString(),
+        ], $u->id);
+
+        $this->assertSame(36000.0, $r['saldo']);
+        $this->assertSame(84000.0, $r['entregar']); // 120.000 − 36.000
+        $this->assertSame('pagado', $p->fresh()->estado);
+        $this->assertSame(0.0, round($p->fresh()->saldo, 2));
+        $this->assertSame('activo', $r['prestamo']->estado);
+
+        $pago = $p->pagos()->where('renovacion', true)->firstOrFail();
+        $this->assertSame(36000.0, (float) $pago->valor);
+
+        // El pago de renovación no cuenta como efectivo cobrado hoy
+        $this->actingAs($u)->get(route('hoy'))->assertOk();
+        $cobradoHoy = \App\Models\Pago::where('renovacion', false)->whereDate('fecha', today())->sum('valor');
+        $this->assertSame(84000.0, (float) $cobradoHoy);
+
+        // ...ni se puede deshacer a mano
+        $this->actingAs($u)->delete(route('pagos.destroy', $pago))->assertStatus(422);
+    }
+
+    public function test_renovar_exige_cubrir_el_saldo_pendiente(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u);
+
+        $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
+            'valor_cuota' => 1000, 'num_cuotas' => 2, 'fecha_inicio' => today()->addDay()->toDateString(),
+        ])->assertSessionHasErrors('valor_cuota');
+
+        $this->assertSame('activo', $p->fresh()->estado);
+        $this->assertSame(1, Prestamo::count());
+    }
+
+    public function test_caja_con_renovacion_solo_sale_la_diferencia(): void
+    {
+        $u = $this->cobrador(120000);
+        $p = $this->prestamo($u); // presta 120.000 → caja 0
+        app(PagoService::class)->aplicar($p, 84000, today()->toDateString(), $u->id); // caja 84.000
+
+        app(PrestamoService::class)->renovar($p->fresh(), [
+            'valor_cuota' => 15000, 'num_cuotas' => 8, 'fecha_inicio' => today()->addDay()->toDateString(),
+        ], $u->id);
+
+        // 120k base + 84k cobrado + 36k renovación − 120k − 120k nuevo = 0 → entregó 84.000 en efectivo
+        $this->assertSame(0.0, app(\App\Services\CajaService::class)->caja($u->id));
     }
 
     public function test_cobrador_ajeno_no_puede_renovar(): void

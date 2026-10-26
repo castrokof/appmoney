@@ -104,13 +104,13 @@ class PrestamoController extends Controller
         return view('prestamos.show', compact('prestamo', 'cal'));
     }
 
-    /** Renueva un préstamo pagado: crea uno nuevo con las mismas condiciones (editables). */
+    /** Renueva un préstamo (pagado o con cuotas pendientes): descuenta el saldo y se entrega la diferencia. */
     public function renovar(Request $request, int $id, PrestamoService $service)
     {
         $anterior = Prestamo::findOrFail($id);
         $this->autorizar($anterior);
 
-        abort_unless($anterior->estado === 'pagado', 422, 'Solo se renuevan préstamos pagados.');
+        abort_unless(in_array($anterior->estado, ['activo', 'pagado'], true), 422, 'Este préstamo no se puede renovar.');
 
         $data = $request->validate([
             'valor_cuota' => 'required|numeric|min:1|max:999999999',
@@ -118,16 +118,14 @@ class PrestamoController extends Controller
             'fecha_inicio' => 'required|date',
         ]);
 
-        $nuevo = $service->crear($data + [
-            'user_id' => $anterior->user_id,
-            'cliente_id' => $anterior->cliente_id,
-            'frecuencia' => $anterior->frecuencia,
-            'saltar_domingos' => $anterior->saltar_domingos,
-            'saltar_festivos' => $anterior->saltar_festivos,
-        ]);
+        $r = $service->renovar($anterior, $data, $request->user()->id);
 
-        return redirect()->route('prestamos.show', $nuevo->id)
-            ->with('ok', 'Préstamo renovado: '.$nuevo->num_cuotas.' cuotas de $'.number_format($nuevo->valor_cuota, 0, ',', '.').'.');
+        $msg = 'Préstamo renovado: '.$r['prestamo']->num_cuotas.' cuotas de $'.number_format($r['prestamo']->valor_cuota, 0, ',', '.').'.';
+        if ($r['saldo'] > 0) {
+            $msg .= ' Saldo anterior descontado: $'.number_format($r['saldo'], 0, ',', '.').'. Entregar al cliente: $'.number_format($r['entregar'], 0, ',', '.').'.';
+        }
+
+        return redirect()->route('prestamos.show', $r['prestamo']->id)->with('ok', $msg);
     }
 
     public function anular(int $id, PrestamoService $service)

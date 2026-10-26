@@ -40,6 +40,7 @@ class PagoController extends Controller
     public function destroy(Pago $pago, PagoService $service)
     {
         $this->autorizar($pago);
+        abort_if($pago->renovacion, 422, 'Este pago viene de una renovación y no se puede deshacer.');
 
         $service->deshacer($pago);
 

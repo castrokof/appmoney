@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class Pago extends Model
 {
-    protected $fillable = ['prestamo_id', 'cuota_id', 'user_id', 'valor', 'fecha', 'nota'];
+    protected $fillable = ['prestamo_id', 'cuota_id', 'user_id', 'valor', 'fecha', 'nota', 'renovacion'];
 
-    protected $casts = ['valor' => 'decimal:2', 'fecha' => 'date'];
+    protected $casts = ['valor' => 'decimal:2', 'fecha' => 'date', 'renovacion' => 'boolean'];
 
     public function prestamo()
     {

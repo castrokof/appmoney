@@ -10,9 +10,9 @@ use Illuminate\Validation\ValidationException;
 class PagoService
 {
     /** Registra un pago y lo aplica en cascada a las cuotas más antiguas. */
-    public function aplicar(Prestamo $prestamo, float $valor, string $fecha, int $userId, ?string $nota = null): Pago
+    public function aplicar(Prestamo $prestamo, float $valor, string $fecha, int $userId, ?string $nota = null, bool $renovacion = false): Pago
     {
-        return DB::transaction(function () use ($prestamo, $valor, $fecha, $userId, $nota) {
+        return DB::transaction(function () use ($prestamo, $valor, $fecha, $userId, $nota, $renovacion) {
             $prestamo = Prestamo::lockForUpdate()->findOrFail($prestamo->id);
 
             if ($prestamo->estado !== 'activo') {
@@ -40,6 +40,7 @@ class PagoService
                 'valor' => $valor,
                 'fecha' => $fecha,
                 'nota' => $nota,
+                'renovacion' => $renovacion,
             ]);
 
             $this->actualizarEstado($prestamo);

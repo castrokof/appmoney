@@ -110,6 +110,51 @@ class PrestamoService
         $p->cuotas()->insert($filas);
     }
 
+    /**
+     * Renueva un préstamo (pagado o con cuotas pendientes). El saldo pendiente del anterior se cancela
+     * con el nuevo préstamo y al cliente se le entrega la diferencia (nuevo monto − saldo).
+     * $data: valor_cuota, num_cuotas, fecha_inicio. Hereda cliente, frecuencia y opciones de fechas.
+     *
+     * @return array{prestamo: Prestamo, saldo: float, entregar: float}
+     */
+    public function renovar(Prestamo $anterior, array $data, int $userId): array
+    {
+        return DB::transaction(function () use ($anterior, $data, $userId) {
+            $anterior = Prestamo::lockForUpdate()->findOrFail($anterior->id);
+
+            if (! in_array($anterior->estado, ['activo', 'pagado'], true)) {
+                throw ValidationException::withMessages(['valor_cuota' => 'Este préstamo no se puede renovar.']);
+            }
+
+            $saldo = round((float) $anterior->cuotas()->sum(DB::raw('valor - pagado')), 2);
+            $nuevoMonto = $this->total((float) $data['valor_cuota'], (int) $data['num_cuotas']);
+
+            if ($nuevoMonto < $saldo) {
+                throw ValidationException::withMessages([
+                    'valor_cuota' => 'El nuevo préstamo ($'.number_format($nuevoMonto, 0, ',', '.').') debe cubrir el saldo pendiente ($'.number_format($saldo, 0, ',', '.').').',
+                ]);
+            }
+
+            if ($saldo > 0) {
+                app(PagoService::class)->aplicar(
+                    $anterior, $saldo, today()->toDateString(), $userId,
+                    'Saldo cancelado por renovación', renovacion: true,
+                );
+            }
+
+            $nuevo = $this->crear($data + [
+                'user_id' => $anterior->user_id,
+                'cliente_id' => $anterior->cliente_id,
+                'frecuencia' => $anterior->frecuencia,
+                'saltar_domingos' => $anterior->saltar_domingos,
+                'saltar_festivos' => $anterior->saltar_festivos,
+            ]);
+            $nuevo->update(['renovado_de_id' => $anterior->id]);
+
+            return ['prestamo' => $nuevo, 'saldo' => $saldo, 'entregar' => round($nuevoMonto - $saldo, 2)];
+        });
+    }
+
     /** Avanza la fecha hasta un día hábil según las opciones del préstamo (solo diarios). */
     private function ajustar(Carbon $fecha, Prestamo $p): Carbon
     {
