@@ -6,13 +6,14 @@ use App\Concerns\ScopesByUser;
 use App\Models\Pago;
 use App\Models\Prestamo;
 use App\Services\CajaService;
+use App\Services\CalificacionService;
 use Illuminate\Http\Request;
 
 class CobroController extends Controller
 {
     use ScopesByUser;
 
-    public function hoy(Request $request, CajaService $caja)
+    public function hoy(Request $request, CajaService $caja, CalificacionService $calificacion)
     {
         $q = trim((string) $request->query('q'));
         $hoy = today();
@@ -25,10 +26,12 @@ class CobroController extends Controller
         $cobradoHoy = (float) Pago::whereIn('user_id', $this->userIds())->whereDate('fecha', $hoy)->sum('valor');
         $cajaTotal = collect($this->userIds())->sum(fn ($id) => $caja->caja($id));
 
-        return view('cobro.hoy', compact('prestamos', 'porCobrar', 'cobradoHoy', 'cajaTotal', 'q'));
+        $cals = $calificacion->paraClientes($prestamos->pluck('cliente_id')->all());
+
+        return view('cobro.hoy', compact('prestamos', 'porCobrar', 'cobradoHoy', 'cajaTotal', 'q', 'cals'));
     }
 
-    public function atrasados(Request $request)
+    public function atrasados(Request $request, CalificacionService $calificacion)
     {
         $q = trim((string) $request->query('q'));
 
@@ -38,7 +41,9 @@ class CobroController extends Controller
 
         $totalAtrasado = $prestamos->sum('atrasado_calc');
 
-        return view('cobro.atrasados', compact('prestamos', 'totalAtrasado', 'q'));
+        $cals = $calificacion->paraClientes($prestamos->pluck('cliente_id')->all());
+
+        return view('cobro.atrasados', compact('prestamos', 'totalAtrasado', 'q', 'cals'));
     }
 
     private function prestamosConCuotaVencida(string $q, bool $soloAtrasados = false)

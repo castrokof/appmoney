@@ -7,6 +7,7 @@ use App\Models\Cliente;
 use App\Models\Cuota;
 use App\Models\Prestamo;
 use App\Services\CajaService;
+use App\Services\CalificacionService;
 use App\Services\PrestamoService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,7 +16,7 @@ class PrestamoController extends Controller
 {
     use ScopesByUser;
 
-    public function index(Request $request)
+    public function index(Request $request, CalificacionService $calificacion)
     {
         $estado = $request->query('estado', 'activo');
         $q = trim((string) $request->query('q'));
@@ -30,10 +31,12 @@ class PrestamoController extends Controller
                 ->where('nombres', 'like', "%$q%")->orWhere('apellidos', 'like', "%$q%")))
             ->latest('id')->paginate(15)->withQueryString();
 
-        return view('prestamos.index', compact('prestamos', 'estado', 'q'));
+        $cals = $calificacion->paraClientes($prestamos->pluck('cliente_id')->all());
+
+        return view('prestamos.index', compact('prestamos', 'estado', 'q', 'cals'));
     }
 
-    public function create(CajaService $caja)
+    public function create(CajaService $caja, CalificacionService $calificacion)
     {
         $usuarios = $this->usuariosVisibles();
         $clientes = Cliente::whereIn('user_id', $this->userIds())->where('activo', true)
@@ -48,6 +51,7 @@ class PrestamoController extends Controller
             'usuarios' => $usuarios,
             'clientes' => $clientes,
             'cajas' => $cajas,
+            'cals' => $calificacion->paraClientes($clientes->pluck('id')->all()),
             'bloquear' => config('cobros.bloquear_sin_base'),
             'clienteId' => request('cliente_id'),
         ]);
@@ -78,12 +82,14 @@ class PrestamoController extends Controller
         return redirect()->route('prestamos.show', $prestamo)->with('ok', 'Préstamo creado con '.$prestamo->num_cuotas.' cuotas.');
     }
 
-    public function show(int $id)
+    public function show(int $id, CalificacionService $calificacion)
     {
         $prestamo = Prestamo::withTrashed()->with('cliente', 'user', 'cuotas', 'pagos.user')->conTotales()->findOrFail($id);
         $this->autorizar($prestamo);
 
-        return view('prestamos.show', compact('prestamo'));
+        $cal = $calificacion->paraCliente($prestamo->cliente_id);
+
+        return view('prestamos.show', compact('prestamo', 'cal'));
     }
 
     public function anular(int $id, PrestamoService $service)

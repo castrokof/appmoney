@@ -13,6 +13,8 @@
 
     <div class="card card-soft mb-3"><div class="card-body small">
         <div><strong>Prestado:</strong> ${{ number_format($prestamo->monto, 0, ',', '.') }} al {{ rtrim(rtrim($prestamo->interes_pct, '0'), '.') }}% · {{ $prestamo->num_cuotas }} cuotas {{ $prestamo->frecuencia }}s desde {{ $prestamo->fecha_inicio->format('d/m/Y') }}</div>
+        <div><strong>Calificación del cliente:</strong> @include('partials.calificacion', ['cal' => $cal])
+            @if ($cal['atrasadas'] > 0)<span class="text-danger">· {{ $cal['atrasadas'] }} cuota(s) atrasada(s), la más vieja hace {{ $cal['dias_max'] }} día(s)</span>@endif</div>
         <div><strong>Cobrador:</strong> {{ $prestamo->user->name }} · <strong>Tel:</strong> {{ $prestamo->cliente->telefono ?: '—' }}</div>
         @if ($prestamo->estado === 'activo')
             <div class="d-flex gap-2 mt-3">

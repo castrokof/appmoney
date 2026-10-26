@@ -201,4 +201,40 @@ class CobrosTest extends TestCase
         $this->actingAs($empresa)->get(route('prestamos.show', $pAjeno->id))->assertNotFound();
         $this->actingAs($empresa)->post(route('bases.store'), ['user_id' => $ajena->id, 'monto' => 1000])->assertForbidden();
     }
+
+    public function test_calificacion_nuevo_buena_y_mala(): void
+    {
+        $u = $this->cobrador();
+        $cal = app(\App\Services\CalificacionService::class);
+
+        // Sin cuotas vencidas: Nuevo
+        $nuevo = $this->prestamo($u, ['fecha_inicio' => today()->addDays(2)->toDateString(), 'saltar_domingos' => false]);
+        $this->assertSame('nuevo', $cal->paraCliente($nuevo->cliente_id)['nivel']);
+
+        // 10 cuotas vencidas, todas pagadas: Excelente (100)
+        $bueno = $this->prestamo($u, ['fecha_inicio' => today()->subDays(10)->toDateString(), 'saltar_domingos' => false]);
+        app(PagoService::class)->aplicar($bueno, 120000, today()->toDateString(), $u->id);
+        $r = $cal->paraCliente($bueno->cliente_id);
+        $this->assertSame('excelente', $r['nivel']);
+        $this->assertSame(100, $r['puntaje']);
+
+        // 10 cuotas vencidas, ninguna pagada, la más vieja hace 10 días: 100 - 60 - 20 = 20 → Mala
+        $malo = $this->prestamo($u, ['fecha_inicio' => today()->subDays(10)->toDateString(), 'saltar_domingos' => false]);
+        $r = $cal->paraCliente($malo->cliente_id);
+        $this->assertSame('mala', $r['nivel']);
+        $this->assertSame(20, $r['puntaje']);
+        $this->assertSame(10, $r['dias_max']);
+    }
+
+    public function test_calificacion_se_muestra_en_las_pantallas(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u, ['fecha_inicio' => today()->subDays(10)->toDateString(), 'saltar_domingos' => false]);
+
+        foreach ([route('hoy'), route('atrasados'), route('clientes.index'), route('prestamos.index'), route('prestamos.show', $p->id), route('prestamos.create')] as $url) {
+            $this->actingAs($u)->get($url)->assertOk();
+        }
+        $this->actingAs($u)->get(route('hoy'))->assertSee('Mala');
+        $this->actingAs($u)->get(route('prestamos.show', $p->id))->assertSee('Calificación del cliente');
+    }
 }

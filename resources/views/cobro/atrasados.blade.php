@@ -15,6 +15,7 @@
             <div class="card-body d-flex justify-content-between align-items-center">
                 <div>
                     <div class="fw-bold">{{ $c->nombre_completo }}</div>
+                    @include('partials.calificacion', ['cal' => $cals[$c->id] ?? null])
                     <div class="small text-secondary">{{ $c->telefono }} · {{ $p->cuotas_atrasadas_calc }} cuota(s) atrasada(s)</div>
                 </div>
                 <div class="text-end">

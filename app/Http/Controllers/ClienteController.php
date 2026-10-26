@@ -4,13 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Concerns\ScopesByUser;
 use App\Models\Cliente;
+use App\Services\CalificacionService;
 use Illuminate\Http\Request;
 
 class ClienteController extends Controller
 {
     use ScopesByUser;
 
-    public function index(Request $request)
+    public function index(Request $request, CalificacionService $calificacion)
     {
         $q = trim((string) $request->query('q'));
 
@@ -25,7 +26,9 @@ class ClienteController extends Controller
             ->orderBy('orden')->orderBy('nombres')
             ->paginate(20)->withQueryString();
 
-        return view('clientes.index', compact('clientes', 'q'));
+        $cals = $calificacion->paraClientes($clientes->pluck('id')->all());
+
+        return view('clientes.index', compact('clientes', 'q', 'cals'));
     }
 
     public function create()

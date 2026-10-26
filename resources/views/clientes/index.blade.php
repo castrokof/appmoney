@@ -15,7 +15,7 @@
         <div class="card card-soft mb-2">
             <div class="card-body d-flex justify-content-between align-items-center">
                 <div>
-                    <div class="fw-bold">{{ $c->nombre_completo }} @unless($c->activo)<span class="badge badge-soft-secondary">Inactivo</span>@endunless</div>
+                    <div class="fw-bold">{{ $c->nombre_completo }} @include('partials.calificacion', ['cal' => $cals[$c->id] ?? null]) @unless($c->activo)<span class="badge badge-soft-secondary">Inactivo</span>@endunless</div>
                     <div class="small text-secondary">{{ $c->telefono ?: 'Sin teléfono' }} · {{ $c->direccion ?: 'Sin dirección' }}</div>
                     @if (auth()->user()->esGestor())<div class="small text-secondary">Cobrador: {{ $c->user->name }}</div>@endif
                 </div>

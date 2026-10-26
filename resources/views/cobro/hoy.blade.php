@@ -22,6 +22,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="me-2">
                         <div class="fw-bold">{{ $c->nombre_completo }}</div>
+                        @include('partials.calificacion', ['cal' => $cals[$c->id] ?? null])
                         <div class="small text-secondary"><i class="bi bi-geo-alt"></i> {{ $c->direccion ?: 'Sin dirección' }}{{ $c->barrio ? ' · '.$c->barrio : '' }}</div>
                         @if ($p->descripcion)<div class="small text-secondary">{{ $p->descripcion }}</div>@endif
                     </div>

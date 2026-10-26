@@ -19,6 +19,7 @@
                     @endforeach
                 </select>
             </div>
+            <div class="col-12 d-none" id="boxCal"><div class="alert py-2 mb-0" id="calAlert"></div></div>
             <div class="col-12"><label class="form-label fw-semibold">Descripción</label>
                 <input name="descripcion" class="form-control" placeholder="Efectivo, Nevera Samsung…" value="{{ old('descripcion') }}"></div>
             <div class="col-6"><label class="form-label fw-semibold">Monto prestado *</label>
@@ -61,6 +62,7 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const cals = @json($cals);
     const cajas = @json($cajas), bloquear = @json($bloquear), yo = {{ auth()->id() }};
     const $ = (id) => document.getElementById(id);
 
@@ -91,6 +93,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const opt = $('cliente').selectedOptions[0];
         const uid = opt && opt.dataset.user ? opt.dataset.user : yo;
+        const cal = opt && opt.value ? cals[opt.value] : null;
+        const box = $('boxCal');
+        if (cal) {
+            const txt = cal.puntaje === null ? 'Cliente nuevo: aún sin historial.'
+                : 'Calificación ' + cal.etiqueta + ' (' + cal.puntaje + '/100)' + (cal.atrasadas ? ' · ' + cal.atrasadas + ' cuota(s) atrasada(s), la más vieja hace ' + cal.dias_max + ' día(s)' : '');
+            $('calAlert').className = 'alert py-2 mb-0 alert-' + cal.color;
+            $('calAlert').textContent = txt;
+            box.classList.remove('d-none');
+        } else box.classList.add('d-none');
         const caja = cajas[uid] ?? 0;
         $('cajaTxt').textContent = money(caja);
         const av = $('avisoBase');
