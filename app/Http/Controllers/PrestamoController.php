@@ -65,9 +65,7 @@ class PrestamoController extends Controller
     {
         $data = $request->validate([
             'cliente_id' => 'required|integer|exists:clientes,id',
-            'modo' => 'required|in:cuota,total',
-            'valor_cuota' => 'required_if:modo,cuota|nullable|numeric|min:1|max:999999999',
-            'monto_total' => 'required_if:modo,total|nullable|numeric|min:1|max:9999999999',
+            'valor_cuota' => 'required|numeric|min:1|max:999999999',
             'num_cuotas' => 'required|integer|min:1|max:520',
             'frecuencia' => ['required', Rule::in(Prestamo::FRECUENCIAS)],
             'saltar_domingos' => 'nullable|boolean',
@@ -77,12 +75,6 @@ class PrestamoController extends Controller
 
         $cliente = Cliente::findOrFail($data['cliente_id']);
         $this->autorizar($cliente);
-
-        if ($data['modo'] === 'cuota') {
-            unset($data['monto_total']);
-        } else {
-            unset($data['valor_cuota']);
-        }
 
         // El préstamo queda a nombre del cobrador dueño del cliente
         $data['user_id'] = $cliente->user_id;

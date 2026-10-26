@@ -21,31 +21,23 @@ class PrestamoService
     }
 
     /**
-     * Crea el préstamo y sus cuotas en una transacción. Dos formas de calcular:
-     *  - por cuota:       se envía valor_cuota → monto = valor_cuota × num_cuotas
-     *  - por monto total: se envía monto_total → valor_cuota = monto_total ÷ num_cuotas
-     *                     (la última cuota ajusta la diferencia de redondeo)
-     * $data: user_id, cliente_id, (valor_cuota | monto_total), num_cuotas, frecuencia,
+     * Crea el préstamo y sus cuotas en una transacción.
+     * El monto del préstamo es valor_cuota × num_cuotas.
+     * $data: user_id, cliente_id, valor_cuota, num_cuotas, frecuencia,
      *        saltar_domingos?, saltar_festivos?, fecha_inicio
      */
     public function crear(array $data): Prestamo
     {
         $n = (int) $data['num_cuotas'];
-
-        if (! empty($data['monto_total'])) {
-            $monto = round((float) $data['monto_total'], 2);
-            $valorCuota = round($monto / max($n, 1), 0);
-        } else {
-            $valorCuota = (float) $data['valor_cuota'];
-            $monto = $this->total($valorCuota, $n);
-        }
+        $valorCuota = (float) $data['valor_cuota'];
+        $monto = $this->total($valorCuota, $n);
 
         if (config('cobros.usar_base') && config('cobros.bloquear_sin_base')) {
             $disponible = $this->caja->caja((int) $data['user_id']);
 
             if ($monto > $disponible) {
                 throw ValidationException::withMessages([
-                    'monto_total' => 'Base insuficiente: disponible $'.number_format($disponible, 0, ',', '.'),
+                    'valor_cuota' => 'Base insuficiente: disponible $'.number_format($disponible, 0, ',', '.'),
                 ]);
             }
         }

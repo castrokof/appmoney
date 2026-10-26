@@ -396,33 +396,20 @@ class CobrosTest extends TestCase
         $this->actingAs($admin)->get(route('resumen'))->assertOk()->assertDontSee('>Caja<', false);
     }
 
-    public function test_calcular_por_monto_total_divide_entre_las_cuotas(): void
-    {
-        $u = $this->cobrador();
-        $cliente = Cliente::create(['user_id' => $u->id, 'nombres' => 'Beto']);
-
-        $p = app(PrestamoService::class)->crear([
-            'user_id' => $u->id, 'cliente_id' => $cliente->id, 'monto_total' => 100000,
-            'num_cuotas' => 3, 'frecuencia' => 'semanal', 'fecha_inicio' => '2026-03-02',
-        ]);
-
-        $this->assertSame(100000.0, (float) $p->monto_total);
-        $this->assertSame(33333.0, (float) $p->valor_cuota);
-        $this->assertSame([33333.0, 33333.0, 33334.0], $p->cuotas->map(fn ($c) => (float) $c->valor)->all());
-    }
-
-    public function test_formulario_crea_prestamo_en_ambos_modos_sin_descripcion(): void
+    public function test_formulario_crea_prestamo_por_cuota_sin_descripcion_ni_monto_total(): void
     {
         $u = $this->cobrador();
         $cliente = Cliente::create(['user_id' => $u->id, 'nombres' => 'Carla']);
         $base = ['cliente_id' => $cliente->id, 'num_cuotas' => 4, 'frecuencia' => 'semanal', 'fecha_inicio' => today()->addDay()->toDateString()];
 
-        $this->actingAs($u)->post(route('prestamos.store'), $base + ['modo' => 'cuota', 'valor_cuota' => 25000])->assertRedirect();
-        $this->actingAs($u)->post(route('prestamos.store'), $base + ['modo' => 'total', 'monto_total' => 80000])->assertRedirect();
-        $this->actingAs($u)->post(route('prestamos.store'), $base + ['modo' => 'total'])->assertSessionHasErrors('monto_total');
+        $this->actingAs($u)->post(route('prestamos.store'), $base + ['valor_cuota' => 25000])->assertRedirect();
+        $this->actingAs($u)->post(route('prestamos.store'), $base)->assertSessionHasErrors('valor_cuota');
 
-        $this->assertSame([100000.0, 80000.0], Prestamo::orderBy('id')->pluck('monto_total')->map(fn ($v) => (float) $v)->all());
-        $this->actingAs($u)->get(route('prestamos.create'))->assertOk()->assertDontSee('name="descripcion"', false);
+        $this->assertSame([100000.0], Prestamo::pluck('monto_total')->map(fn ($v) => (float) $v)->all());
+        $this->actingAs($u)->get(route('prestamos.create'))->assertOk()
+            ->assertDontSee('name="descripcion"', false)
+            ->assertDontSee('name="monto_total"', false)
+            ->assertDontSee('Calcular por');
     }
 
     public function test_listado_muestra_en_que_cuota_va(): void

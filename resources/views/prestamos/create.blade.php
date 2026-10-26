@@ -22,19 +22,8 @@
                 </select>
             </div>
             <div class="col-12 d-none" id="boxCal"><div class="alert py-2 mb-0" id="calAlert"></div></div>
-            <div class="col-12">
-                <label class="form-label fw-semibold">Calcular por</label>
-                <div class="btn-group w-100" role="group">
-                    <input type="radio" class="btn-check" name="modo" id="modoCuota" value="cuota" @checked(old('modo', 'cuota') === 'cuota')>
-                    <label class="btn btn-outline-primary" for="modoCuota">Valor de la cuota</label>
-                    <input type="radio" class="btn-check" name="modo" id="modoTotal" value="total" @checked(old('modo') === 'total')>
-                    <label class="btn btn-outline-primary" for="modoTotal">Monto total</label>
-                </div>
-            </div>
-            <div class="col-6" id="boxCuota"><label class="form-label fw-semibold">Valor de la cuota *</label>
-                <input name="valor_cuota" id="valorCuota" type="number" step="any" min="1" inputmode="decimal" class="form-control form-control-lg" value="{{ old('valor_cuota') }}"></div>
-            <div class="col-6" id="boxTotal"><label class="form-label fw-semibold">Monto total *</label>
-                <input name="monto_total" id="montoTotal" type="number" step="any" min="1" inputmode="decimal" class="form-control form-control-lg" value="{{ old('monto_total') }}"></div>
+            <div class="col-6"><label class="form-label fw-semibold">Valor de la cuota *</label>
+                <input name="valor_cuota" id="valorCuota" type="number" step="any" min="1" inputmode="decimal" class="form-control form-control-lg" required value="{{ old('valor_cuota') }}"></div>
             <div class="col-6"><label class="form-label fw-semibold">N.º de cuotas *</label>
                 <input name="num_cuotas" id="cuotas" type="number" min="1" class="form-control form-control-lg" required value="{{ old('num_cuotas', 20) }}"></div>
             <div class="col-6"><label class="form-label fw-semibold">Frecuencia *</label>
@@ -63,8 +52,7 @@
 
         <div class="rounded-4 p-3 mt-4 text-white" style="background:var(--brand-grad)">
             <div class="row text-center">
-                <div class="col-4"><div class="small opacity-75">Monto total</div><div class="fs-6 fw-bold text-nowrap" id="pvTotal">$0</div></div>
-                <div class="col-4"><div class="small opacity-75">Cuota</div><div class="fs-6 fw-bold text-nowrap" id="pvCuota">$0</div></div>
+                <div class="col-8"><div class="small opacity-75">Monto del préstamo (cuota × n.º de cuotas)</div><div class="fs-4 fw-bold text-nowrap" id="pvTotal">$0</div></div>
                 <div class="col-4"><div class="small opacity-75">Última cuota</div><div class="fs-6 fw-bold" id="pvFin">—</div></div>
             </div>
         </div>
@@ -107,16 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function actualizar() {
         const n = parseInt($('cuotas').value) || 1, frec = $('frecuencia').value;
-        const porTotal = $('modoTotal').checked;
-        $('boxCuota').style.display = porTotal ? 'none' : '';
-        $('boxTotal').style.display = porTotal ? '' : 'none';
-        $('valorCuota').required = !porTotal;
-        $('montoTotal').required = porTotal;
-        // por cuota: monto = cuota × n.º de cuotas · por monto total: cuota = monto ÷ n.º de cuotas
-        const monto = porTotal ? (parseFloat($('montoTotal').value) || 0) : (parseFloat($('valorCuota').value) || 0) * n;
-        const cuota = porTotal ? Math.round(monto / n) : (parseFloat($('valorCuota').value) || 0);
+        const monto = (parseFloat($('valorCuota').value) || 0) * n; // monto = valor de la cuota × n.º de cuotas
         $('pvTotal').textContent = money(monto);
-        $('pvCuota').textContent = money(cuota);
         $('boxDomingo').style.display = frec === 'diario' ? '' : 'none';
         if ($('inicio').value) $('pvFin').textContent = fechaFinal($('inicio').value, n, frec, $('domingos').checked, $('festivos').checked)
             .toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
