@@ -22,7 +22,7 @@ class GastoController extends Controller
             ->orderByDesc('fecha')->orderByDesc('id')->get();
 
         $total = $gastos->sum('monto');
-        $cajaActual = $caja->caja(auth()->id());
+        $cajaActual = config('cobros.usar_base') ? $caja->caja(auth()->id()) : null;
         $mes = $inicio->format('Y-m');
 
         return view('gastos.index', compact('gastos', 'total', 'mes', 'cajaActual'));
@@ -34,7 +34,7 @@ class GastoController extends Controller
         $data['user_id'] = auth()->id();
 
         $advertencia = null;
-        if ($data['monto'] > $caja->caja($data['user_id'])) {
+        if (config('cobros.usar_base') && $data['monto'] > $caja->caja($data['user_id'])) {
             $advertencia = ' Atención: el gasto deja la caja en negativo.';
         }
 

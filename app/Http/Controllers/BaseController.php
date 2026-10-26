@@ -11,6 +11,11 @@ class BaseController extends Controller
 {
     use ScopesByUser;
 
+    public function __construct()
+    {
+        abort_unless(config('cobros.usar_base'), 404);
+    }
+
     public function index(CajaService $caja)
     {
         $usuarios = $this->usuariosVisibles();

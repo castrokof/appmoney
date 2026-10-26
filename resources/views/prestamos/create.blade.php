@@ -4,10 +4,12 @@
 <div class="card card-soft"><div class="card-body">
     <form method="POST" action="{{ route('prestamos.store') }}" id="formPrestamo">
         @csrf
-        <div class="alert alert-primary py-2 d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-bank"></i> Caja disponible del cobrador</span>
-            <strong id="cajaTxt">$0</strong>
-        </div>
+        @if ($usarBase)
+            <div class="alert alert-primary py-2 d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-bank"></i> Caja disponible del cobrador</span>
+                <strong id="cajaTxt">$0</strong>
+            </div>
+        @endif
 
         <div class="row g-3">
             <div class="col-12">
@@ -63,7 +65,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const cals = @json($cals);
-    const cajas = @json($cajas), bloquear = @json($bloquear), yo = {{ auth()->id() }};
+    const cajas = @json($cajas), bloquear = @json($bloquear), usarBase = @json($usarBase), yo = {{ auth()->id() }};
     const $ = (id) => document.getElementById(id);
 
     function fechaFinal(inicio, n, frec, saltar) {
@@ -102,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             $('calAlert').textContent = txt;
             box.classList.remove('d-none');
         } else box.classList.add('d-none');
+        if (!usarBase) return;
         const caja = cajas[uid] ?? 0;
         $('cajaTxt').textContent = money(caja);
         const av = $('avisoBase');

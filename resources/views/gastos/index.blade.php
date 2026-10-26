@@ -42,7 +42,7 @@
                 <input name="descripcion" id="gDesc" maxlength="150" class="form-control" required>
                 <label class="form-label fw-semibold mt-3">Fecha</label>
                 <input name="fecha" id="gFecha" type="date" class="form-control">
-                <div class="small text-secondary mt-2">Tu caja actual: ${{ number_format($cajaActual, 0, ',', '.') }}</div>
+                @if ($cajaActual !== null)<div class="small text-secondary mt-2">Tu caja actual: ${{ number_format($cajaActual, 0, ',', '.') }}</div>@endif
             </div>
             <div class="modal-footer border-0 pt-0"><button class="btn btn-primary btn-lg w-100 fw-bold">Guardar</button></div>
         </form>

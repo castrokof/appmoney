@@ -17,13 +17,13 @@
 
     <h2 class="h6 fw-bold text-uppercase text-secondary mt-4">Por cobrador</h2>
     <div class="card card-soft mb-3"><div class="table-responsive"><table class="table table-sm align-middle mb-0">
-        <thead><tr><th>Cobrador</th><th class="text-end">Cobrado</th><th class="text-end">Prestado</th><th class="text-end">Gastos</th><th class="text-end">Caja</th></tr></thead>
+        <thead><tr><th>Cobrador</th><th class="text-end">Cobrado</th><th class="text-end">Prestado</th><th class="text-end">Gastos</th>@if (config('cobros.usar_base'))<th class="text-end">Caja</th>@endif</tr></thead>
         <tbody>@foreach ($cobradoresRows as $r)
             <tr><td>{{ $r['usuario']->name }}</td>
                 <td class="text-end">${{ number_format($r['cobrado_periodo'], 0, ',', '.') }}</td>
                 <td class="text-end">${{ number_format($r['prestado'], 0, ',', '.') }}</td>
                 <td class="text-end">${{ number_format($r['gastos'], 0, ',', '.') }}</td>
-                <td class="text-end fw-bold {{ $r['caja'] < 0 ? 'text-danger' : '' }}">${{ number_format($r['caja'], 0, ',', '.') }}</td></tr>
+                @if (config('cobros.usar_base'))<td class="text-end fw-bold {{ $r['caja'] < 0 ? 'text-danger' : '' }}">${{ number_format($r['caja'], 0, ',', '.') }}</td>@endif</tr>
         @endforeach</tbody>
     </table></div></div>
 

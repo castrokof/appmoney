@@ -6,10 +6,10 @@
         ['prestamos.index', 'bi-journal-text', 'Préstamos'],
     ];
     $mas = [
-        ['gastos.index', 'bi-receipt', 'Gastos', false],
-        ['bases.index', 'bi-bank', 'Base de dinero', true],
-        ['resumen', 'bi-bar-chart-line', 'Resumen', true],
-        ['usuarios.index', 'bi-person-gear', 'Usuarios', true],
+        ['gastos.index', 'bi-receipt', 'Gastos', false, false],
+        ['bases.index', 'bi-bank', 'Base de dinero', true, true],
+        ['resumen', 'bi-bar-chart-line', 'Resumen', true, false],
+        ['usuarios.index', 'bi-person-gear', 'Usuarios', true, false],
     ];
     $gestor = auth()->user()->esGestor();
     $grupo = fn ($n) => explode('.', $n)[0];
@@ -32,8 +32,8 @@
         <button type="button" data-instalar class="btn btn-primary w-100 fw-bold rounded-pill mb-2 d-none"><i class="bi bi-download"></i> Instalar app en el celular</button>
         <div class="alert alert-info small py-2 d-none" data-instalar-ios>Para instalar: toca <i class="bi bi-box-arrow-up"></i> Compartir y luego «Añadir a pantalla de inicio».</div>
         <div class="list-group list-group-flush">
-            @foreach ($mas as [$name, $icon, $label, $soloGestor])
-                @if (! $soloGestor || $gestor)
+            @foreach ($mas as [$name, $icon, $label, $soloGestor, $requiereBase])
+                @if ((! $soloGestor || $gestor) && (empty($requiereBase) || config('cobros.usar_base')))
                     <a class="list-group-item list-group-item-action py-3" href="{{ route($name) }}">
                         <i class="bi {{ $icon }} me-2 text-primary"></i>{{ $label }}
                     </a>

@@ -17,6 +17,12 @@ class CobrosTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['cobros.usar_base' => true]); // la base está apagada por defecto; estas pruebas la ejercitan
+    }
+
     private function cobrador(float $base = 1000000): User
     {
         $u = User::factory()->create(['role' => 'cobrador', 'empresa_id' => 1]);
@@ -251,5 +257,22 @@ class CobrosTest extends TestCase
         }
         $this->assertFileExists(public_path('sw.js'));
         $this->assertFileExists(public_path('offline.html'));
+    }
+
+    public function test_con_la_base_apagada_no_se_valida_ni_se_muestra_caja(): void
+    {
+        config(['cobros.usar_base' => false]);
+        $u = $this->cobrador(0); // sin base entregada
+
+        $p = $this->prestamo($u, ['monto' => 5000000]); // se puede prestar sin base
+        $this->assertSame(10, $p->cuotas()->count());
+
+        $this->actingAs($u)->get(route('hoy'))->assertOk()->assertDontSee('Caja disponible');
+        $this->actingAs($u)->get(route('prestamos.create'))->assertOk()->assertDontSee('Caja disponible');
+        $this->actingAs($u)->get(route('gastos.index'))->assertOk()->assertDontSee('Tu caja actual');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $this->actingAs($admin)->get(route('bases.index'))->assertNotFound();
+        $this->actingAs($admin)->get(route('resumen'))->assertOk()->assertDontSee('>Caja<', false);
     }
 }

@@ -21,13 +21,18 @@ $min-contrast-ratio: 3;
     --brand-grad: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
 }
 
-body { padding-bottom: calc(var(--nav-h) + 1rem); }
+html { -webkit-tap-highlight-color: transparent; }
+body {
+    padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 1rem);
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+}
 
 // Cabecera con degradado
 .app-header {
     background: var(--brand-grad);
     color: #fff;
-    padding: 1.1rem 1rem 3.2rem;
+    padding: calc(1.1rem + env(safe-area-inset-top)) 1rem 3.2rem;
     border-radius: 0 0 1.6rem 1.6rem;
 
     h1 { font-size: 1.15rem; font-weight: 700; margin: 0; }
@@ -52,7 +57,7 @@ body { padding-bottom: calc(var(--nav-h) + 1rem); }
 // Barra de navegación inferior (móvil)
 .bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 1030;
-    height: var(--nav-h);
+    height: calc(var(--nav-h) + env(safe-area-inset-bottom));
     background: #fff;
     border-top: 1px solid #e5e7eb;
     display: flex;
@@ -78,7 +83,7 @@ body { padding-bottom: calc(var(--nav-h) + 1rem); }
 
 // Login
 .login-wrap {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
     background: var(--brand-grad); padding: 1rem;
 }
 .login-card { width: 100%; max-width: 400px; }

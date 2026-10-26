@@ -33,12 +33,15 @@ class PrestamoService
     public function crear(array $data): Prestamo
     {
         $monto = (float) $data['monto'];
-        $disponible = $this->caja->caja((int) $data['user_id']);
 
-        if ($monto > $disponible && config('cobros.bloquear_sin_base')) {
-            throw ValidationException::withMessages([
-                'monto' => 'Base insuficiente: disponible $'.number_format($disponible, 0, ',', '.'),
-            ]);
+        if (config('cobros.usar_base') && config('cobros.bloquear_sin_base')) {
+            $disponible = $this->caja->caja((int) $data['user_id']);
+
+            if ($monto > $disponible) {
+                throw ValidationException::withMessages([
+                    'monto' => 'Base insuficiente: disponible $'.number_format($disponible, 0, ',', '.'),
+                ]);
+            }
         }
 
         return DB::transaction(function () use ($data, $monto) {

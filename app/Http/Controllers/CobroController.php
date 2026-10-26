@@ -24,11 +24,12 @@ class CobroController extends Controller
 
         $porCobrar = $prestamos->sum('hoy_calc');
         $cobradoHoy = (float) Pago::whereIn('user_id', $this->userIds())->whereDate('fecha', $hoy)->sum('valor');
-        $cajaTotal = collect($this->userIds())->sum(fn ($id) => $caja->caja($id));
+        $cajaTotal = config('cobros.usar_base') ? collect($this->userIds())->sum(fn ($id) => $caja->caja($id)) : null;
+        $atrasadoTotal = $prestamos->sum('atrasado_calc');
 
         $cals = $calificacion->paraClientes($prestamos->pluck('cliente_id')->all());
 
-        return view('cobro.hoy', compact('prestamos', 'porCobrar', 'cobradoHoy', 'cajaTotal', 'q', 'cals'));
+        return view('cobro.hoy', compact('prestamos', 'porCobrar', 'cobradoHoy', 'cajaTotal', 'atrasadoTotal', 'q', 'cals'));
     }
 
     public function atrasados(Request $request, CalificacionService $calificacion)

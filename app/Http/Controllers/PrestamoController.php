@@ -43,8 +43,10 @@ class PrestamoController extends Controller
             ->orderBy('nombres')->get(['id', 'user_id', 'nombres', 'apellidos']);
 
         $cajas = [];
-        foreach ($usuarios as $u) {
-            $cajas[$u->id] = $caja->caja($u->id);
+        if (config('cobros.usar_base')) {
+            foreach ($usuarios as $u) {
+                $cajas[$u->id] = $caja->caja($u->id);
+            }
         }
 
         return view('prestamos.create', [
@@ -53,6 +55,7 @@ class PrestamoController extends Controller
             'cajas' => $cajas,
             'cals' => $calificacion->paraClientes($clientes->pluck('id')->all()),
             'bloquear' => config('cobros.bloquear_sin_base'),
+            'usarBase' => config('cobros.usar_base'),
             'clienteId' => request('cliente_id'),
         ]);
     }
