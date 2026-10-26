@@ -13,8 +13,14 @@
     "src": "resources/js/app.js",
     "isEntry": true
   },
+  "resources/js/ruta.js": {
+    "file": "assets/ruta-BZhh9w5-.js",
+    "name": "ruta",
+    "src": "resources/js/ruta.js",
+    "isEntry": true
+  },
   "resources/scss/app.scss": {
-    "file": "assets/app-BLYc8AJc.css",
+    "file": "assets/app-N2gM4WC8.css",
     "src": "resources/scss/app.scss",
     "isEntry": true
   }

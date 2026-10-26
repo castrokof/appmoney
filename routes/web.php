@@ -7,6 +7,7 @@ use App\Http\Controllers\GastoController;
 use App\Http\Controllers\PagoController;
 use App\Http\Controllers\PrestamoController;
 use App\Http\Controllers\ResumenController;
+use App\Http\Controllers\RutaController;
 use App\Http\Controllers\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
@@ -15,6 +16,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/atrasados', [CobroController::class, 'atrasados'])->name('atrasados');
 
     Route::resource('clientes', ClienteController::class)->except('show');
+    Route::get('/ruta', [RutaController::class, 'index'])->name('ruta.index');
+    Route::post('/ruta', [RutaController::class, 'guardar'])->name('ruta.guardar');
 
     Route::resource('prestamos', PrestamoController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('prestamos/{prestamo}/renovar', [PrestamoController::class, 'renovar'])->name('prestamos.renovar');

@@ -44,6 +44,9 @@ class ClienteController extends Controller
         $data = $this->validar($request);
         $data['user_id'] = $this->userIdPermitido($request->integer('user_id'));
 
+        // Los clientes nuevos van al final de la ruta (se reordenan en «Ordenar ruta»)
+        $data['orden'] = ((int) Cliente::where('user_id', $data['user_id'])->max('orden')) + 1;
+
         Cliente::create($data);
 
         return redirect()->route('clientes.index')->with('ok', 'Cliente creado.');
@@ -94,9 +97,7 @@ class ClienteController extends Controller
             'direccion' => 'nullable|string|max:255',
             'barrio' => 'nullable|string|max:120',
             'observacion' => 'nullable|string|max:1000',
-            'orden' => 'nullable|integer|min:0',
         ]);
-        $data['orden'] = $data['orden'] ?? 0;
         $data['activo'] = $request->boolean('activo', true);
 
         return $data;

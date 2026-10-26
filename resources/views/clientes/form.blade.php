@@ -19,8 +19,6 @@
                 <input name="direccion" class="form-control" value="{{ old('direccion', $cliente->direccion) }}"></div>
             <div class="col-md-4"><label class="form-label fw-semibold">Barrio</label>
                 <input name="barrio" class="form-control" value="{{ old('barrio', $cliente->barrio) }}"></div>
-            <div class="col-md-4"><label class="form-label fw-semibold">Orden en la ruta</label>
-                <input name="orden" type="number" min="0" class="form-control" value="{{ old('orden', $cliente->orden) }}"></div>
             @if (auth()->user()->esGestor())
                 <div class="col-md-8"><label class="form-label fw-semibold">Cobrador</label>
                     <select name="user_id" class="form-select">

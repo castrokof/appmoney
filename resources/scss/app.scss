@@ -101,3 +101,13 @@ body {
 .btn-user { color: #fff; border: 1px solid rgba(255, 255, 255, .45); background: rgba(255, 255, 255, .15); border-radius: 999px; }
 
 .badge-soft-primary { background: #e0e7ff; color: #3730a3; }
+
+// Ordenar ruta
+.drag-handle { cursor: grab; touch-action: none; }
+.ruta-ghost { opacity: .45; }
+.min-w-0 { min-width: 0; }
+.ruta-barra {
+    position: fixed; left: 0; right: 0; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+    background: #fff; border-top: 1px solid #e5e7eb; padding: .6rem 0; z-index: 1020;
+}
+@include media-breakpoint-up(md) { .ruta-barra { left: 90px; bottom: 0; } }

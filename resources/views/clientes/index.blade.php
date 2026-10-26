@@ -8,6 +8,7 @@
                 <input name="q" value="{{ $q }}" class="form-control border-0" placeholder="Nombre, documento o teléfono">
             </div>
         </form>
+        <a href="{{ route('ruta.index') }}" class="btn btn-outline-primary btn-lg bg-white" title="Ordenar ruta"><i class="bi bi-signpost-split"></i></a>
         <a href="{{ route('clientes.create') }}" class="btn btn-primary btn-lg"><i class="bi bi-plus-lg"></i></a>
     </div>
 

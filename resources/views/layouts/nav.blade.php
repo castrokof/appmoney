@@ -6,6 +6,7 @@
         ['prestamos.index', 'bi-journal-text', 'Préstamos'],
     ];
     $mas = [
+        ['ruta.index', 'bi-signpost-split', 'Ordenar ruta', false, false],
         ['gastos.index', 'bi-receipt', 'Gastos', false, false],
         ['bases.index', 'bi-bank', 'Base de dinero', true, true],
         ['resumen', 'bi-bar-chart-line', 'Resumen', true, false],

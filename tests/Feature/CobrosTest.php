@@ -35,10 +35,10 @@ class CobrosTest extends TestCase
 
     private function prestamo(User $u, array $over = []): Prestamo
     {
-        $cliente = Cliente::create(['user_id' => $u->id, 'nombres' => 'Ana']);
+        $clienteId = $over['cliente_id'] ?? Cliente::create(['user_id' => $u->id, 'nombres' => 'Ana'])->id;
 
         return app(PrestamoService::class)->crear($over + [
-            'user_id' => $u->id, 'cliente_id' => $cliente->id,
+            'user_id' => $u->id, 'cliente_id' => $clienteId,
             'valor_cuota' => 12000, 'num_cuotas' => 10, 'frecuencia' => 'diario',
             'saltar_domingos' => true, 'saltar_festivos' => false, 'fecha_inicio' => '2026-01-04', // domingo
         ]);
@@ -448,5 +448,48 @@ class CobrosTest extends TestCase
         $this->actingAs($u)->get(route('prestamos.show', $renovado->id))->assertSee('Renovación del préstamo');
         $this->actingAs($u)->get(route('prestamos.index', ['estado' => 'anulado']))->assertOk();
         $this->actingAs($u)->get(route('prestamos.index', ['estado' => 'todos']))->assertOk();
+    }
+
+    public function test_ordenar_ruta_guarda_el_orden_y_hoy_lo_respeta(): void
+    {
+        $u = $this->cobrador();
+        $ids = [];
+        foreach (['Ana', 'Beto', 'Carla'] as $n) {
+            $c = Cliente::create(['user_id' => $u->id, 'nombres' => $n]);
+            $this->prestamo($u, ['cliente_id' => $c->id, 'fecha_inicio' => today()->toDateString(), 'saltar_domingos' => false]);
+            $ids[$n] = $c->id;
+        }
+
+        $this->actingAs($u)->get(route('ruta.index'))->assertOk()->assertSee('Ordenar ruta');
+
+        $this->actingAs($u)->postJson(route('ruta.guardar'), ['orden' => [$ids['Carla'], $ids['Ana'], $ids['Beto']]])->assertOk();
+
+        $this->assertSame([1, 2, 3], [Cliente::find($ids['Carla'])->orden, Cliente::find($ids['Ana'])->orden, Cliente::find($ids['Beto'])->orden]);
+        $this->actingAs($u)->get(route('hoy'))->assertSeeInOrder(['Carla', 'Ana', 'Beto']);
+    }
+
+    public function test_ordenar_ruta_no_permite_clientes_de_otro_cobrador(): void
+    {
+        $a = $this->cobrador();
+        $b = $this->cobrador();
+        $propio = Cliente::create(['user_id' => $a->id, 'nombres' => 'Propio']);
+        $ajeno = Cliente::create(['user_id' => $b->id, 'nombres' => 'Ajeno', 'orden' => 7]);
+
+        $this->actingAs($a)->postJson(route('ruta.guardar'), ['orden' => [$propio->id, $ajeno->id]])->assertForbidden();
+        $this->assertSame(7, $ajeno->fresh()->orden);
+
+        // Si manda el user_id de otro, se ignora: solo puede tocar su propia ruta
+        $this->actingAs($a)->postJson(route('ruta.guardar'), ['user_id' => $b->id, 'orden' => [$propio->id]])->assertOk();
+        $this->assertSame(1, $propio->fresh()->orden);
+        $this->assertSame(7, $ajeno->fresh()->orden);
+    }
+
+    public function test_cliente_nuevo_queda_al_final_de_la_ruta(): void
+    {
+        $u = $this->cobrador();
+        $this->actingAs($u)->post(route('clientes.store'), ['nombres' => 'Primero']);
+        $this->actingAs($u)->post(route('clientes.store'), ['nombres' => 'Segundo']);
+
+        $this->assertSame([1, 2], Cliente::orderBy('id')->pluck('orden')->all());
     }
 }
