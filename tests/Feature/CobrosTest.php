@@ -422,4 +422,31 @@ class CobrosTest extends TestCase
         $this->actingAs($u)->get(route('prestamos.index'))->assertSee('Cuota 3/10');
         $this->actingAs($u)->get(route('hoy'))->assertSee('Cuota 3/10');
     }
+
+    public function test_detalle_del_prestamo_carga_en_todos_los_estados(): void
+    {
+        $u = $this->cobrador();
+        $pagos = app(PagoService::class);
+
+        $activo = $this->prestamo($u, ['fecha_inicio' => today()->subDays(4)->toDateString(), 'saltar_domingos' => false]);
+        $pagos->aplicar($activo, 30000, today()->toDateString(), $u->id);
+
+        $pagado = $this->prestamo($u);
+        $pagos->aplicar($pagado, 120000, today()->toDateString(), $u->id);
+
+        $anulado = $this->prestamo($u);
+        app(PrestamoService::class)->anular($anulado);
+
+        $renovado = app(PrestamoService::class)->renovar($activo->fresh(), [
+            'valor_cuota' => 20000, 'num_cuotas' => 6, 'fecha_inicio' => today()->addDay()->toDateString(),
+        ], $u->id)['prestamo'];
+
+        foreach ([$activo, $pagado, $anulado, $renovado] as $p) {
+            $this->actingAs($u)->get(route('prestamos.show', $p->id))->assertOk();
+        }
+        $this->actingAs($u)->get(route('prestamos.show', $activo->id))->assertSee('Renovación (sin efectivo)');
+        $this->actingAs($u)->get(route('prestamos.show', $renovado->id))->assertSee('Renovación del préstamo');
+        $this->actingAs($u)->get(route('prestamos.index', ['estado' => 'anulado']))->assertOk();
+        $this->actingAs($u)->get(route('prestamos.index', ['estado' => 'todos']))->assertOk();
+    }
 }
