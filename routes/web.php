@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\BaseController;
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\CobroController;
@@ -33,6 +34,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/bases', [BaseController::class, 'index'])->name('bases.index');
         Route::post('/bases', [BaseController::class, 'store'])->name('bases.store');
         Route::get('/resumen', [ResumenController::class, 'index'])->name('resumen');
+        Route::get('/auditoria', [AuditoriaController::class, 'index'])->name('auditoria.index');
         Route::resource('usuarios', UsuarioController::class)->except('show');
     });
 });

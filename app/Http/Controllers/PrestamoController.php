@@ -6,6 +6,7 @@ use App\Concerns\ScopesByUser;
 use App\Models\Cliente;
 use App\Models\Cuota;
 use App\Models\Prestamo;
+use App\Services\AuditoriaService;
 use App\Services\CajaService;
 use App\Services\CalificacionService;
 use App\Services\PrestamoService;
@@ -92,8 +93,9 @@ class PrestamoController extends Controller
         $this->autorizar($prestamo);
 
         $cal = $calificacion->paraCliente($prestamo->cliente_id);
+        $auditoria = \App\Models\Auditoria::with('user')->where('prestamo_id', $prestamo->id)->latest('id')->limit(100)->get();
 
-        return view('prestamos.show', compact('prestamo', 'cal'));
+        return view('prestamos.show', compact('prestamo', 'cal', 'auditoria'));
     }
 
     /** Renueva un préstamo (pagado o con cuotas pendientes): descuenta el saldo y se entrega la diferencia. */
@@ -126,28 +128,41 @@ class PrestamoController extends Controller
         return redirect()->route('prestamos.show', $r['prestamo']->id)->with('ok', $msg);
     }
 
-    public function anular(int $id, PrestamoService $service)
+    public function anular(Request $request, int $id, PrestamoService $service)
     {
+        $motivo = $request->validate(['motivo' => 'required|string|min:5|max:255'])['motivo'];
+
         $prestamo = Prestamo::findOrFail($id);
         $this->autorizar($prestamo);
 
         $u = auth()->user();
         abort_unless($u->esGestor() || ! $prestamo->pagos()->exists(), 403, 'Solo admin o empresa pueden anular un préstamo con pagos.');
 
-        $service->anular($prestamo);
+        $service->anular($prestamo, $motivo);
 
         return redirect()->route('prestamos.index')->with('ok', 'Préstamo anulado.');
     }
 
-    public function moverCuota(Request $request, Cuota $cuota)
+    public function moverCuota(Request $request, Cuota $cuota, AuditoriaService $auditoria)
     {
         $prestamo = Prestamo::findOrFail($cuota->prestamo_id);
         $this->autorizar($prestamo);
 
         abort_if($cuota->estado !== 'pendiente', 422, 'Solo se mueven cuotas pendientes.');
 
-        $data = $request->validate(['fecha' => 'required|date']);
+        $data = $request->validate([
+            'fecha' => 'required|date',
+            'motivo' => 'required|string|min:5|max:255',
+        ]);
+
+        $antes = $cuota->fecha->toDateString();
         $cuota->update(['fecha' => $data['fecha']]);
+
+        if ($antes !== $cuota->fecha->toDateString()) {
+            $auditoria->registrar('cuota.fecha_movida',
+                'Cuota '.$cuota->numero.': fecha movida del '.\Carbon\Carbon::parse($antes)->format('d/m/Y').' al '.$cuota->fecha->format('d/m/Y'),
+                $prestamo->id, 'cuota', $cuota->id, $data['motivo'], ['fecha' => $antes], ['fecha' => $cuota->fecha->toDateString()]);
+        }
 
         return back()->with('ok', 'Fecha de la cuota actualizada.');
     }

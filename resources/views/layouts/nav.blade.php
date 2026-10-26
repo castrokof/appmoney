@@ -10,6 +10,7 @@
         ['gastos.index', 'bi-receipt', 'Gastos', false, false],
         ['bases.index', 'bi-bank', 'Base de dinero', true, true],
         ['resumen', 'bi-bar-chart-line', 'Resumen', true, false],
+        ['auditoria.index', 'bi-shield-check', 'Auditoría', true, false],
         ['usuarios.index', 'bi-person-gear', 'Usuarios', true, false],
     ];
     $gestor = auth()->user()->esGestor();

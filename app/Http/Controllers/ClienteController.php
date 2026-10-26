@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Concerns\ScopesByUser;
 use App\Models\Cliente;
+use App\Services\AuditoriaService;
 use App\Services\CalificacionService;
 use Illuminate\Http\Request;
 
@@ -75,13 +76,16 @@ class ClienteController extends Controller
         return redirect()->route('clientes.index')->with('ok', 'Cliente actualizado.');
     }
 
-    public function destroy(Cliente $cliente)
+    public function destroy(Request $request, Cliente $cliente, AuditoriaService $auditoria)
     {
         $this->autorizar($cliente);
+        $motivo = $request->validate(['motivo' => 'required|string|min:5|max:255'])['motivo'];
 
         if ($cliente->prestamos()->where('estado', 'activo')->exists()) {
             return back()->withErrors(['cliente' => 'El cliente tiene préstamos activos.']);
         }
+        $auditoria->registrar('cliente.eliminado', 'Cliente «'.$cliente->nombre_completo.'» eliminado', null, 'cliente', $cliente->id, $motivo,
+            ['nombres' => $cliente->nombres, 'apellidos' => $cliente->apellidos, 'documento' => $cliente->documento, 'telefono' => $cliente->telefono]);
         $cliente->delete();
 
         return redirect()->route('clientes.index')->with('ok', 'Cliente eliminado.');

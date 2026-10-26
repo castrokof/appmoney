@@ -148,7 +148,7 @@ class CobrosTest extends TestCase
         $this->assertSame(84000.0, (float) $cobradoHoy);
 
         // ...ni se puede deshacer a mano
-        $this->actingAs($u)->delete(route('pagos.destroy', $pago))->assertStatus(422);
+        $this->actingAs($u)->delete(route('pagos.destroy', $pago), ['motivo' => 'Prueba de motivo'])->assertStatus(422);
     }
 
     public function test_renovar_exige_cubrir_el_saldo_pendiente(): void
@@ -237,7 +237,7 @@ class CobrosTest extends TestCase
         $ultimo = $s->aplicar($p, 70000, today()->toDateString(), $u->id);
         $this->assertSame('pagado', $p->fresh()->estado);
 
-        $s->deshacer($ultimo);
+        $s->deshacer($ultimo, 'Error de digitación');
 
         $this->assertSame('activo', $p->fresh()->estado);
         $this->assertSame(70000.0, round((float) $p->fresh()->saldo, 2));
@@ -537,5 +537,116 @@ class CobrosTest extends TestCase
 
         $nuevo = Prestamo::where('renovado_de_id', $p->id)->firstOrFail();
         $this->assertSame([33333.0, 33333.0, 33334.0], $nuevo->cuotas->map(fn ($c) => (float) $c->valor)->all());
+    }
+
+    public function test_deshacer_pago_exige_motivo_y_deja_auditoria(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u);
+        $pago = app(PagoService::class)->aplicar($p, 36000, today()->toDateString(), $u->id);
+
+        // Sin motivo (o muy corto) no se deshace
+        $this->actingAs($u)->delete(route('pagos.destroy', $pago))->assertSessionHasErrors('motivo');
+        $this->actingAs($u)->delete(route('pagos.destroy', $pago), ['motivo' => 'ab'])->assertSessionHasErrors('motivo');
+        $this->assertDatabaseHas('pagos', ['id' => $pago->id]);
+
+        $this->actingAs($u)->delete(route('pagos.destroy', $pago), ['motivo' => 'El cliente no pagó, lo anoté por error'])->assertRedirect();
+
+        $this->assertDatabaseMissing('pagos', ['id' => $pago->id]);
+        $a = \App\Models\Auditoria::where('accion', 'pago.deshecho')->firstOrFail();
+        $this->assertSame($u->id, $a->user_id);
+        $this->assertSame($p->id, $a->prestamo_id);
+        $this->assertSame('El cliente no pagó, lo anoté por error', $a->motivo);
+        $this->assertSame(36000.0, (float) $a->antes['valor']);
+        $this->assertSame(84000.0, (float) $a->despues['saldo_antes']);
+        $this->assertSame(120000.0, (float) $a->despues['saldo_despues']);
+    }
+
+    public function test_mover_fecha_y_anular_exigen_motivo_y_quedan_registrados(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u, ['saltar_domingos' => false, 'fecha_inicio' => today()->addDays(5)->toDateString()]);
+        $cuota = $p->cuotas()->first();
+        $nueva = today()->addDays(20)->toDateString();
+
+        $this->actingAs($u)->patch(route('cuotas.fecha', $cuota), ['fecha' => $nueva])->assertSessionHasErrors('motivo');
+        $this->assertNotSame($nueva, $cuota->fresh()->fecha->toDateString());
+
+        $this->actingAs($u)->patch(route('cuotas.fecha', $cuota), ['fecha' => $nueva, 'motivo' => 'Cliente viaja esa semana'])->assertRedirect();
+        $a = \App\Models\Auditoria::where('accion', 'cuota.fecha_movida')->firstOrFail();
+        $this->assertSame($cuota->fecha->toDateString(), $a->antes['fecha']);
+        $this->assertSame($nueva, $a->despues['fecha']);
+        $this->assertSame('Cliente viaja esa semana', $a->motivo);
+
+        $this->actingAs($u)->post(route('prestamos.anular', $p->id))->assertSessionHasErrors('motivo');
+        $this->assertSame('activo', $p->fresh()->estado);
+
+        $this->actingAs($u)->post(route('prestamos.anular', $p->id), ['motivo' => 'Se creó al cliente equivocado'])->assertRedirect();
+        $this->assertDatabaseHas('auditorias', ['accion' => 'prestamo.anulado', 'prestamo_id' => $p->id, 'motivo' => 'Se creó al cliente equivocado']);
+    }
+
+    public function test_gasto_y_cliente_eliminados_exigen_motivo(): void
+    {
+        $u = $this->cobrador();
+        $g = Gasto::create(['user_id' => $u->id, 'monto' => 5000, 'descripcion' => 'Almuerzo', 'fecha' => today()]);
+        $c = Cliente::create(['user_id' => $u->id, 'nombres' => 'Zoe']);
+
+        $this->actingAs($u)->delete(route('gastos.destroy', $g))->assertSessionHasErrors('motivo');
+        $this->actingAs($u)->delete(route('clientes.destroy', $c))->assertSessionHasErrors('motivo');
+        $this->assertNotNull($g->fresh());
+
+        $this->actingAs($u)->delete(route('gastos.destroy', $g), ['motivo' => 'Gasto duplicado'])->assertRedirect();
+        $this->actingAs($u)->delete(route('clientes.destroy', $c), ['motivo' => 'Cliente repetido'])->assertRedirect();
+
+        $this->assertSoftDeleted('gastos', ['id' => $g->id]);
+        $this->assertSoftDeleted('clientes', ['id' => $c->id]);
+        $this->assertDatabaseHas('auditorias', ['accion' => 'gasto.eliminado', 'motivo' => 'Gasto duplicado', 'user_id' => $u->id]);
+        $this->assertDatabaseHas('auditorias', ['accion' => 'cliente.eliminado', 'motivo' => 'Cliente repetido', 'user_id' => $u->id]);
+    }
+
+    public function test_el_historial_se_ve_en_el_prestamo_y_solo_gestores_ven_la_auditoria_general(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u);
+        $pago = app(PagoService::class)->aplicar($p, 12000, today()->toDateString(), $u->id);
+        $this->actingAs($u)->delete(route('pagos.destroy', $pago), ['motivo' => 'Pago duplicado por error']);
+
+        $this->actingAs($u)->get(route('prestamos.show', $p->id))->assertOk()
+            ->assertSee('Historial de cambios')->assertSee('Pago deshecho')->assertSee('Pago duplicado por error');
+
+        $this->actingAs($u)->get(route('auditoria.index'))->assertForbidden();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $this->actingAs($admin)->get(route('auditoria.index'))->assertOk()->assertSee('Pago duplicado por error');
+    }
+
+    public function test_la_auditoria_no_se_puede_editar_ni_borrar(): void
+    {
+        $a = app(\App\Services\AuditoriaService::class)->registrar('pago.registrado', 'Prueba');
+
+        $this->expectException(\LogicException::class);
+        $a->update(['resumen' => 'Alterado']);
+    }
+
+    public function test_la_auditoria_no_se_puede_borrar(): void
+    {
+        $a = app(\App\Services\AuditoriaService::class)->registrar('pago.registrado', 'Prueba');
+
+        $this->expectException(\LogicException::class);
+        $a->delete();
+    }
+
+    public function test_empresa_solo_ve_la_auditoria_de_su_empresa(): void
+    {
+        $mio = $this->cobrador();
+        $ajeno = User::factory()->create(['role' => 'cobrador', 'empresa_id' => 2]);
+        $empresa = User::factory()->create(['role' => 'empresa', 'empresa_id' => 1]);
+
+        $this->actingAs($mio);
+        app(\App\Services\AuditoriaService::class)->registrar('gasto.editado', 'Cambio del cobrador propio');
+        $this->actingAs($ajeno);
+        app(\App\Services\AuditoriaService::class)->registrar('gasto.editado', 'Cambio de otra empresa');
+
+        $this->actingAs($empresa)->get(route('auditoria.index'))->assertOk()
+            ->assertSee('Cambio del cobrador propio')->assertDontSee('Cambio de otra empresa');
     }
 }

@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 class PrestamoService
 {
-    public function __construct(private CajaService $caja)
+    public function __construct(private CajaService $caja, private AuditoriaService $auditoria)
     {
     }
 
@@ -63,6 +63,11 @@ class PrestamoService
             ]);
 
             $this->generarCuotas($prestamo);
+
+            $this->auditoria->registrar('prestamo.creado',
+                'Préstamo de '.AuditoriaService::dinero($monto).' en '.$n.' cuotas de '.AuditoriaService::dinero($valorCuota).' ('.$prestamo->frecuencia.')',
+                $prestamo->id, 'prestamo', $prestamo->id, null, null,
+                ['monto' => $monto, 'cuotas' => $n, 'valor_cuota' => $valorCuota, 'frecuencia' => $prestamo->frecuencia, 'cliente_id' => $prestamo->cliente_id]);
 
             return $prestamo;
         });
@@ -145,7 +150,18 @@ class PrestamoService
             ]);
             $nuevo->update(['renovado_de_id' => $anterior->id]);
 
-            return ['prestamo' => $nuevo, 'saldo' => $saldo, 'entregar' => round($nuevoMonto - $saldo, 2)];
+            $entregar = round($nuevoMonto - $saldo, 2);
+            $this->auditoria->registrar('prestamo.renovado',
+                'Renovado con el préstamo #'.$nuevo->id.': saldo '.AuditoriaService::dinero($saldo).' cancelado',
+                $anterior->id, 'prestamo', $anterior->id, null,
+                ['estado' => $anterior->estado, 'saldo' => $saldo], ['estado' => 'pagado', 'renovado_en' => $nuevo->id]);
+            $this->auditoria->registrar('prestamo.renovado',
+                'Renovación del préstamo #'.$anterior->id.': nuevo monto '.AuditoriaService::dinero($nuevoMonto)
+                    .', saldo descontado '.AuditoriaService::dinero($saldo).', entregado '.AuditoriaService::dinero($entregar),
+                $nuevo->id, 'prestamo', $nuevo->id, null, null,
+                ['monto' => $nuevoMonto, 'saldo_descontado' => $saldo, 'entregado' => $entregar, 'renueva_a' => $anterior->id]);
+
+            return ['prestamo' => $nuevo, 'saldo' => $saldo, 'entregar' => $entregar];
         });
     }
 
@@ -164,10 +180,15 @@ class PrestamoService
         return $fecha;
     }
 
-    /** Anula: estado + softDelete. Su monto vuelve a la caja (deja de sumarse). */
-    public function anular(Prestamo $p): void
+    /** Anula: estado + softDelete. Su monto vuelve a la caja (deja de sumarse). Queda registro con el motivo. */
+    public function anular(Prestamo $p, string $motivo = 'Sin motivo'): void
     {
-        DB::transaction(function () use ($p) {
+        DB::transaction(function () use ($p, $motivo) {
+            $saldo = round((float) $p->cuotas()->sum(DB::raw('valor - pagado')), 2);
+            $this->auditoria->registrar('prestamo.anulado',
+                'Préstamo de '.AuditoriaService::dinero($p->monto_total).' anulado (saldo '.AuditoriaService::dinero($saldo).')',
+                $p->id, 'prestamo', $p->id, $motivo,
+                ['estado' => $p->estado, 'monto' => (float) $p->monto_total, 'saldo' => $saldo], ['estado' => 'anulado']);
             $p->update(['estado' => 'anulado']);
             $p->delete();
         });

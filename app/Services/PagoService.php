@@ -9,6 +9,10 @@ use Illuminate\Validation\ValidationException;
 
 class PagoService
 {
+    public function __construct(private AuditoriaService $auditoria)
+    {
+    }
+
     /** Registra un pago y lo aplica en cascada a las cuotas más antiguas. */
     public function aplicar(Prestamo $prestamo, float $valor, string $fecha, int $userId, ?string $nota = null, bool $renovacion = false): Pago
     {
@@ -45,17 +49,35 @@ class PagoService
 
             $this->actualizarEstado($prestamo);
 
+            if (! $renovacion) { // el pago de renovación ya queda en el evento «préstamo renovado»
+                $this->auditoria->registrar('pago.registrado',
+                    'Pago de '.AuditoriaService::dinero($valor).' registrado'.($nota ? " ({$nota})" : ''),
+                    $prestamo->id, 'pago', $pago->id, null, null,
+                    ['valor' => $valor, 'fecha' => $fecha, 'cobro_user_id' => $userId]);
+            }
+
             return $pago;
         });
     }
 
-    /** Borra el pago y reconstruye las cuotas con los pagos restantes. */
-    public function deshacer(Pago $pago): void
+    /** Borra el pago y reconstruye las cuotas con los pagos restantes. Deja registro con el motivo. */
+    public function deshacer(Pago $pago, string $motivo): void
     {
-        DB::transaction(function () use ($pago) {
+        DB::transaction(function () use ($pago, $motivo) {
             $prestamo = Prestamo::withTrashed()->findOrFail($pago->prestamo_id);
+            $antes = ['pago_id' => $pago->id, 'valor' => (float) $pago->valor, 'fecha' => $pago->fecha->toDateString(),
+                'nota' => $pago->nota, 'cobro_user_id' => $pago->user_id, 'registrado_el' => $pago->created_at?->toDateTimeString()];
+            $saldoAntes = round((float) $prestamo->cuotas()->sum(DB::raw('valor - pagado')), 2);
+
+            // Al deshacer, el saldo vuelve a subir exactamente el valor del pago
+            $this->auditoria->registrar('pago.deshecho',
+                'Pago de '.AuditoriaService::dinero($pago->valor).' del '.$pago->fecha->format('d/m/Y').' deshecho',
+                $prestamo->id, 'pago', $pago->id, $motivo, $antes,
+                ['saldo_antes' => $saldoAntes, 'saldo_despues' => round($saldoAntes + (float) $pago->valor, 2)]);
+
             $pago->delete();
             $this->reconstruir($prestamo);
+
         });
     }
 

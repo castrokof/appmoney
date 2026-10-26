@@ -22,7 +22,7 @@
                 <button class="btn btn-success btn-cobrar flex-grow-1"
                     onclick="abrirPago({{ $prestamo->id }}, @js($prestamo->cliente->nombre_completo), {{ $prestamo->por_cobrar_hoy ?: $prestamo->valor_cuota }}, {{ $prestamo->saldo_calc }})">
                     <i class="bi bi-cash-stack"></i> Registrar pago</button>
-                <form method="POST" action="{{ route('prestamos.anular', $prestamo->id) }}" onsubmit="return confirm('¿Anular este préstamo?')">
+                <form method="POST" action="{{ route('prestamos.anular', $prestamo->id) }}" data-motivo="¿Por qué anulas este préstamo?">
                     @csrf <button class="btn btn-outline-danger btn-cobrar">Anular</button>
                 </form>
             </div>
@@ -110,9 +110,9 @@
                 <td>{{ $c->numero }}</td>
                 <td>
                     @if ($c->estado === 'pendiente' && $prestamo->estado === 'activo')
-                        <form method="POST" action="{{ route('cuotas.fecha', $c) }}" class="d-flex">
+                        <form method="POST" action="{{ route('cuotas.fecha', $c) }}" class="d-flex" data-motivo="¿Por qué mueves la fecha de la cuota {{ $c->numero }}?">
                             @csrf @method('PATCH')
-                            <input type="date" name="fecha" value="{{ $c->fecha->toDateString() }}" class="form-control form-control-sm border-0 bg-transparent px-0" onchange="this.form.submit()" style="min-width:125px">
+                            <input type="date" name="fecha" value="{{ $c->fecha->toDateString() }}" class="form-control form-control-sm border-0 bg-transparent px-0" onchange="this.form.requestSubmit()" style="min-width:125px">
                         </form>
                     @else {{ $c->fecha->format('d/m/Y') }} @endif
                 </td>
@@ -132,13 +132,31 @@
                     <div class="small text-secondary">{{ $pg->fecha->format('d/m/Y') }} · {{ $pg->user->name }}{{ $pg->nota ? ' · '.$pg->nota : '' }}</div>
                     @if ($pg->renovacion)<span class="badge badge-soft-primary"><i class="bi bi-arrow-repeat"></i> Renovación (sin efectivo)</span>@endif</div>
                 @if ($prestamo->estado !== 'anulado' && ! $pg->renovacion)
-                    <form method="POST" action="{{ route('pagos.destroy', $pg) }}" onsubmit="return confirm('¿Deshacer este pago?')">
+                    <form method="POST" action="{{ route('pagos.destroy', $pg) }}" data-motivo="¿Por qué deshaces este pago de ${{ number_format($pg->valor, 0, ',', '.') }}?">
                         @csrf @method('DELETE') <button class="btn btn-sm btn-outline-danger rounded-pill">Deshacer</button>
                     </form>
                 @endif
             </div>
         @empty
             <div class="text-secondary text-center">Sin pagos todavía.</div>
+        @endforelse
+    </div></div>
+
+    <h2 class="h6 fw-bold text-uppercase text-secondary mt-4"><i class="bi bi-shield-check"></i> Historial de cambios</h2>
+    <div class="card card-soft mb-3"><div class="card-body">
+        @forelse ($auditoria as $a)
+            @php [$etq, $color, $icono] = $a->etiqueta; @endphp
+            <div class="py-2 {{ ! $loop->last ? 'border-bottom' : '' }}">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <span class="badge badge-soft-{{ $color === 'primary' ? 'success' : $color }}"><i class="bi {{ $icono }}"></i> {{ $etq }}</span>
+                    <span class="small text-secondary text-end">{{ $a->created_at->format('d/m/Y H:i') }}</span>
+                </div>
+                <div class="small mt-1">{{ $a->resumen }}</div>
+                @if ($a->motivo)<div class="small fst-italic text-secondary">Motivo: «{{ $a->motivo }}»</div>@endif
+                <div class="small text-secondary">Por {{ $a->user->name ?? 'sistema' }}</div>
+            </div>
+        @empty
+            <div class="text-center text-secondary">Sin cambios registrados.</div>
         @endforelse
     </div></div>
 

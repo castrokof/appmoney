@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Concerns\ScopesByUser;
 use App\Models\Gasto;
+use App\Services\AuditoriaService;
 use App\Services\CajaService;
 use Illuminate\Http\Request;
 
@@ -43,17 +44,29 @@ class GastoController extends Controller
         return redirect()->route('gastos.index')->with('ok', 'Gasto registrado.'.$advertencia);
     }
 
-    public function update(Request $request, Gasto $gasto)
+    public function update(Request $request, Gasto $gasto, AuditoriaService $auditoria)
     {
         $this->autorizar($gasto);
+        $antes = ['monto' => (float) $gasto->monto, 'descripcion' => $gasto->descripcion, 'fecha' => $gasto->fecha->toDateString()];
         $gasto->update($this->validar($request));
+        $despues = ['monto' => (float) $gasto->monto, 'descripcion' => $gasto->descripcion, 'fecha' => $gasto->fecha->toDateString()];
+
+        if ($antes !== $despues) {
+            $auditoria->registrar('gasto.editado', 'Gasto «'.$gasto->descripcion.'» editado', null, 'gasto', $gasto->id, null, $antes, $despues);
+        }
 
         return redirect()->route('gastos.index')->with('ok', 'Gasto actualizado.');
     }
 
-    public function destroy(Gasto $gasto)
+    public function destroy(Request $request, Gasto $gasto, AuditoriaService $auditoria)
     {
         $this->autorizar($gasto);
+        $motivo = $request->validate(['motivo' => 'required|string|min:5|max:255'])['motivo'];
+
+        $auditoria->registrar('gasto.eliminado',
+            'Gasto «'.$gasto->descripcion.'» de '.AuditoriaService::dinero($gasto->monto).' eliminado',
+            null, 'gasto', $gasto->id, $motivo,
+            ['monto' => (float) $gasto->monto, 'descripcion' => $gasto->descripcion, 'fecha' => $gasto->fecha->toDateString()]);
         $gasto->delete();
 
         return redirect()->route('gastos.index')->with('ok', 'Gasto eliminado.');

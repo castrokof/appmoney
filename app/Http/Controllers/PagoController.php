@@ -37,12 +37,14 @@ class PagoController extends Controller
         return back()->with('ok', 'Pago registrado.');
     }
 
-    public function destroy(Pago $pago, PagoService $service)
+    public function destroy(Request $request, Pago $pago, PagoService $service)
     {
+        $motivo = $request->validate(['motivo' => 'required|string|min:5|max:255'])['motivo'];
+
         $this->autorizar($pago);
         abort_if($pago->renovacion, 422, 'Este pago viene de una renovación y no se puede deshacer.');
 
-        $service->deshacer($pago);
+        $service->deshacer($pago, $motivo);
 
         return back()->with('ok', 'Pago deshecho; las cuotas se recalcularon.');
     }

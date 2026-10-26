@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\AuditoriaService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -33,7 +34,9 @@ class UsuarioController extends Controller
         $data = $this->validar($request);
         $data['password'] = $request->validate(['password' => 'required|string|min:8'])['password'];
 
-        User::create($data);
+        $usuario = User::create($data);
+        app(AuditoriaService::class)->registrar('usuario.creado', 'Usuario «'.$usuario->name.'» creado ('.$usuario->role.')', null, 'usuario', $usuario->id,
+            null, null, ['email' => $usuario->email, 'role' => $usuario->role, 'empresa_id' => $usuario->empresa_id]);
 
         return redirect()->route('usuarios.index')->with('ok', 'Usuario creado.');
     }
@@ -55,17 +58,27 @@ class UsuarioController extends Controller
             unset($data['role'], $data['activo']); // no te quites tu propio acceso
         }
 
+        $antes = $usuario->only(['name', 'email', 'role', 'empresa_id', 'activo']);
         $usuario->update($data);
+        $despues = $usuario->only(['name', 'email', 'role', 'empresa_id', 'activo']);
+
+        if ($antes !== $despues || $request->filled('password')) {
+            app(AuditoriaService::class)->registrar('usuario.editado',
+                'Usuario «'.$usuario->name.'» editado'.($request->filled('password') ? ' (cambio de contraseña)' : ''),
+                null, 'usuario', $usuario->id, null, $antes, $despues);
+        }
 
         return redirect()->route('usuarios.index')->with('ok', 'Usuario actualizado.');
     }
 
-    public function destroy(int $id)
+    public function destroy(Request $request, int $id)
     {
         $usuario = $this->alcance()->findOrFail($id);
         abort_if($usuario->id === auth()->id(), 422, 'No puedes desactivarte a ti mismo.');
+        $motivo = $request->validate(['motivo' => 'required|string|min:5|max:255'])['motivo'];
 
         $usuario->update(['activo' => false]);
+        app(AuditoriaService::class)->registrar('usuario.desactivado', 'Usuario «'.$usuario->name.'» desactivado', null, 'usuario', $usuario->id, $motivo);
 
         return redirect()->route('usuarios.index')->with('ok', 'Usuario desactivado.');
     }

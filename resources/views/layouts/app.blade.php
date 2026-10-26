@@ -42,6 +42,7 @@
 
     @include('layouts.nav')
 
+    @include('partials.motivo')
     @include('partials.pwa-script')
     @stack('scripts')
 </body>

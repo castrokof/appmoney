@@ -20,7 +20,7 @@
                 @if ($g->user_id === auth()->id() || auth()->user()->esGestor())
                     <button class="btn btn-sm btn-outline-secondary rounded-circle"
                         data-gasto="{{ json_encode(['id' => $g->id, 'monto' => (float) $g->monto, 'descripcion' => $g->descripcion, 'fecha' => $g->fecha->toDateString()]) }}" onclick="editarGasto(JSON.parse(this.dataset.gasto))"><i class="bi bi-pencil"></i></button>
-                    <form method="POST" action="{{ route('gastos.destroy', $g) }}" class="d-inline" onsubmit="return confirm('¿Eliminar gasto?')">
+                    <form method="POST" action="{{ route('gastos.destroy', $g) }}" class="d-inline" data-motivo="¿Por qué eliminas este gasto?">
                         @csrf @method('DELETE') <button class="btn btn-sm btn-outline-danger rounded-circle"><i class="bi bi-trash"></i></button>
                     </form>
                 @endif

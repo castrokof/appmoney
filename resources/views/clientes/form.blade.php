@@ -40,7 +40,7 @@
         </div>
     </form>
     @if ($cliente->exists)
-        <form method="POST" action="{{ route('clientes.destroy', $cliente) }}" class="mt-3" onsubmit="return confirm('¿Eliminar este cliente?')">
+        <form method="POST" action="{{ route('clientes.destroy', $cliente) }}" class="mt-3" data-motivo="¿Por qué eliminas a este cliente?">
             @csrf @method('DELETE')
             <button class="btn btn-link text-danger p-0">Eliminar cliente</button>
         </form>
