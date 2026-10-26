@@ -17,7 +17,7 @@
             </div>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
-                <button class="btn btn-sm btn-light bg-opacity-25 text-white border-0" title="Salir">
+                <button class="btn btn-sm btn-user" title="Salir">
                     <i class="bi bi-box-arrow-right"></i> {{ auth()->user()->name }}
                 </button>
             </form>

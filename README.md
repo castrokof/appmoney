@@ -18,3 +18,24 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 - Los assets compilados (`public/build`) van en el repo: el hosting **no necesita Node**.
 - Tras cambiar CSS/JS en local: `npm install && npm run build` y commitear `public/build`.
 - Primer admin: se crea con `php artisan db:seed` usando `ADMIN_EMAIL` y `ADMIN_PASSWORD` del `.env`.
+
+## Módulos
+
+| Ruta | Quién | Qué hace |
+|---|---|---|
+| `/` | todos | Cobro de hoy: tarjetas con botón **Cobrar**, totales y caja |
+| `/atrasados` | todos | Préstamos con cuotas vencidas |
+| `/clientes` | todos | CRUD y búsqueda; orden de ruta |
+| `/prestamos` | todos | Crear (con vista previa), detalle, cuotas, deshacer pagos, anular |
+| `/gastos` | todos | Gastos del cobrador por mes |
+| `/bases` | admin, empresa | Entregar base de dinero y ver la caja por cobrador |
+| `/resumen` | admin, empresa | Cobrado por día/cobrador, total en la calle, atrasado |
+| `/usuarios` | admin, empresa | Crear y desactivar usuarios |
+
+Config: `COBROS_BLOQUEAR_SIN_BASE=true|false` en `.env` (rechazar o solo advertir cuando el préstamo supera la caja).
+
+## Pruebas
+
+```bash
+php artisan test
+```

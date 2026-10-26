@@ -21,4 +21,28 @@ trait ScopesByUser
 
         return [$u->id];
     }
+
+    /** Usuarios dentro del alcance (para selects de cobrador). */
+    protected function usuariosVisibles()
+    {
+        return User::whereIn('id', $this->userIds())->where('activo', true)->orderBy('name')->get();
+    }
+
+    /** 404 si el registro pertenece a un usuario fuera del alcance (evita ver datos ajenos por URL). */
+    protected function autorizar($modelo, string $campo = 'user_id'): void
+    {
+        abort_unless(in_array($modelo->{$campo}, $this->userIds(), true), 404);
+    }
+
+    /** Valida que un user_id recibido del formulario esté dentro del alcance; si no es gestor, siempre el propio. */
+    protected function userIdPermitido(?int $pedido): int
+    {
+        $u = auth()->user();
+        if (! $u->esGestor() || ! $pedido) {
+            return $u->id;
+        }
+        abort_unless(in_array($pedido, $this->userIds(), true), 403);
+
+        return $pedido;
+    }
 }

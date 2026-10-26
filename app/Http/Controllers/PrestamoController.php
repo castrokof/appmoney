@@ -1,0 +1,114 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Concerns\ScopesByUser;
+use App\Models\Cliente;
+use App\Models\Cuota;
+use App\Models\Prestamo;
+use App\Services\CajaService;
+use App\Services\PrestamoService;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+class PrestamoController extends Controller
+{
+    use ScopesByUser;
+
+    public function index(Request $request)
+    {
+        $estado = $request->query('estado', 'activo');
+        $q = trim((string) $request->query('q'));
+
+        // Los anulados están borrados lógicamente: se listan aparte
+        $query = $estado === 'anulado' ? Prestamo::onlyTrashed() : Prestamo::query();
+
+        $prestamos = $query->with('cliente', 'user')->conTotales()
+            ->whereIn('user_id', $this->userIds())
+            ->when(! in_array($estado, ['todos', 'anulado'], true), fn ($qq) => $qq->where('estado', $estado))
+            ->when($q, fn ($qq) => $qq->whereHas('cliente', fn ($c) => $c
+                ->where('nombres', 'like', "%$q%")->orWhere('apellidos', 'like', "%$q%")))
+            ->latest('id')->paginate(15)->withQueryString();
+
+        return view('prestamos.index', compact('prestamos', 'estado', 'q'));
+    }
+
+    public function create(CajaService $caja)
+    {
+        $usuarios = $this->usuariosVisibles();
+        $clientes = Cliente::whereIn('user_id', $this->userIds())->where('activo', true)
+            ->orderBy('nombres')->get(['id', 'user_id', 'nombres', 'apellidos']);
+
+        $cajas = [];
+        foreach ($usuarios as $u) {
+            $cajas[$u->id] = $caja->caja($u->id);
+        }
+
+        return view('prestamos.create', [
+            'usuarios' => $usuarios,
+            'clientes' => $clientes,
+            'cajas' => $cajas,
+            'bloquear' => config('cobros.bloquear_sin_base'),
+            'clienteId' => request('cliente_id'),
+        ]);
+    }
+
+    public function store(Request $request, PrestamoService $service)
+    {
+        $data = $request->validate([
+            'cliente_id' => 'required|integer|exists:clientes,id',
+            'descripcion' => 'nullable|string|max:255',
+            'monto' => 'required|numeric|min:1|max:9999999999',
+            'interes_pct' => 'required|numeric|min:0|max:999',
+            'num_cuotas' => 'required|integer|min:1|max:520',
+            'frecuencia' => ['required', Rule::in(Prestamo::FRECUENCIAS)],
+            'saltar_domingos' => 'nullable|boolean',
+            'fecha_inicio' => 'required|date',
+        ]);
+
+        $cliente = Cliente::findOrFail($data['cliente_id']);
+        $this->autorizar($cliente);
+
+        // El préstamo queda a nombre del cobrador dueño del cliente
+        $data['user_id'] = $cliente->user_id;
+        $data['saltar_domingos'] = $request->boolean('saltar_domingos');
+
+        $prestamo = $service->crear($data);
+
+        return redirect()->route('prestamos.show', $prestamo)->with('ok', 'Préstamo creado con '.$prestamo->num_cuotas.' cuotas.');
+    }
+
+    public function show(int $id)
+    {
+        $prestamo = Prestamo::withTrashed()->with('cliente', 'user', 'cuotas', 'pagos.user')->conTotales()->findOrFail($id);
+        $this->autorizar($prestamo);
+
+        return view('prestamos.show', compact('prestamo'));
+    }
+
+    public function anular(int $id, PrestamoService $service)
+    {
+        $prestamo = Prestamo::findOrFail($id);
+        $this->autorizar($prestamo);
+
+        $u = auth()->user();
+        abort_unless($u->esGestor() || ! $prestamo->pagos()->exists(), 403, 'Solo admin o empresa pueden anular un préstamo con pagos.');
+
+        $service->anular($prestamo);
+
+        return redirect()->route('prestamos.index')->with('ok', 'Préstamo anulado.');
+    }
+
+    public function moverCuota(Request $request, Cuota $cuota)
+    {
+        $prestamo = Prestamo::findOrFail($cuota->prestamo_id);
+        $this->autorizar($prestamo);
+
+        abort_if($cuota->estado !== 'pendiente', 422, 'Solo se mueven cuotas pendientes.');
+
+        $data = $request->validate(['fecha' => 'required|date']);
+        $cuota->update(['fecha' => $data['fecha']]);
+
+        return back()->with('ok', 'Fecha de la cuota actualizada.');
+    }
+}
