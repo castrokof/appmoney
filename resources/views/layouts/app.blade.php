@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#4f46e5">
     <title>@yield('title', 'Cobros') · {{ config('app.name') }}</title>
+    @include('partials.pwa-head')
     @vite(['resources/scss/app.scss', 'resources/js/app.js'])
 </head>
 <body>
@@ -41,6 +42,7 @@
 
     @include('layouts.nav')
 
+    @include('partials.pwa-script')
     @stack('scripts')
 </body>
 </html>

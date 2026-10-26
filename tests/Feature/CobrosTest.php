@@ -237,4 +237,19 @@ class CobrosTest extends TestCase
         $this->actingAs($u)->get(route('hoy'))->assertSee('Mala');
         $this->actingAs($u)->get(route('prestamos.show', $p->id))->assertSee('Calificación del cliente');
     }
+
+    public function test_la_app_es_instalable_pwa(): void
+    {
+        $this->get('/login')->assertOk()
+            ->assertSee('rel="manifest"', false)
+            ->assertSee('serviceWorker', false);
+
+        $manifest = json_decode(file_get_contents(public_path('manifest.webmanifest')), true);
+        $this->assertSame('standalone', $manifest['display']);
+        foreach ($manifest['icons'] as $icon) {
+            $this->assertFileExists(public_path(ltrim($icon['src'], '/')));
+        }
+        $this->assertFileExists(public_path('sw.js'));
+        $this->assertFileExists(public_path('offline.html'));
+    }
 }

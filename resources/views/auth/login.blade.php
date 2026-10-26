@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ingresar · {{ config('app.name') }}</title>
+    <meta name="theme-color" content="#4f46e5">
+    @include('partials.pwa-head')
     @vite(['resources/scss/app.scss', 'resources/js/app.js'])
 </head>
 <body class="p-0">
@@ -38,5 +40,12 @@
             </div>
         </div>
     </div>
+    <div class="position-fixed bottom-0 start-0 end-0 p-3 d-none" data-instalar>
+        <button type="button" class="btn btn-light w-100 fw-bold rounded-pill"><i class="bi bi-download"></i> Instalar app en el celular</button>
+    </div>
+    <div class="position-fixed bottom-0 start-0 end-0 p-3 text-center text-white small d-none" data-instalar-ios>
+        Para instalar: toca <i class="bi bi-box-arrow-up"></i> Compartir y luego «Añadir a pantalla de inicio».
+    </div>
+    @include('partials.pwa-script')
 </body>
 </html>

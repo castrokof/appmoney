@@ -29,6 +29,8 @@
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body">
+        <button type="button" data-instalar class="btn btn-primary w-100 fw-bold rounded-pill mb-2 d-none"><i class="bi bi-download"></i> Instalar app en el celular</button>
+        <div class="alert alert-info small py-2 d-none" data-instalar-ios>Para instalar: toca <i class="bi bi-box-arrow-up"></i> Compartir y luego «Añadir a pantalla de inicio».</div>
         <div class="list-group list-group-flush">
             @foreach ($mas as [$name, $icon, $label, $soloGestor])
                 @if (! $soloGestor || $gestor)
