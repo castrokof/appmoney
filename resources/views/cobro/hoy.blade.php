@@ -28,7 +28,7 @@
                         <div class="fw-bold">{{ $c->nombre_completo }}</div>
                         @include('partials.calificacion', ['cal' => $cals[$c->id] ?? null])
                         <div class="small text-secondary"><i class="bi bi-geo-alt"></i> {{ $c->direccion ?: 'Sin dirección' }}{{ $c->barrio ? ' · '.$c->barrio : '' }}</div>
-                        @if ($p->descripcion)<div class="small text-secondary">{{ $p->descripcion }}</div>@endif
+                        @include('partials.cuota-actual', ['p' => $p])
                     </div>
                     <div class="text-end">
                         <div class="fs-5 fw-bolder text-primary">${{ number_format($p->hoy_calc, 0, ',', '.') }}</div>

@@ -22,12 +22,19 @@
                 </select>
             </div>
             <div class="col-12 d-none" id="boxCal"><div class="alert py-2 mb-0" id="calAlert"></div></div>
-            <div class="col-12"><label class="form-label fw-semibold">Descripción</label>
-                <input name="descripcion" class="form-control" placeholder="Efectivo, Nevera Samsung…" value="{{ old('descripcion') }}"></div>
-            <div class="col-6"><label class="form-label fw-semibold">Monto prestado *</label>
-                <input name="monto" id="monto" type="number" step="any" min="1" inputmode="decimal" class="form-control form-control-lg" required value="{{ old('monto') }}"></div>
-            <div class="col-6"><label class="form-label fw-semibold">Interés total % *</label>
-                <input name="interes_pct" id="interes" type="number" step="any" min="0" inputmode="decimal" class="form-control form-control-lg" required value="{{ old('interes_pct', 20) }}"></div>
+            <div class="col-12">
+                <label class="form-label fw-semibold">Calcular por</label>
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="modo" id="modoCuota" value="cuota" @checked(old('modo', 'cuota') === 'cuota')>
+                    <label class="btn btn-outline-primary" for="modoCuota">Valor de la cuota</label>
+                    <input type="radio" class="btn-check" name="modo" id="modoTotal" value="total" @checked(old('modo') === 'total')>
+                    <label class="btn btn-outline-primary" for="modoTotal">Monto total</label>
+                </div>
+            </div>
+            <div class="col-6" id="boxCuota"><label class="form-label fw-semibold">Valor de la cuota *</label>
+                <input name="valor_cuota" id="valorCuota" type="number" step="any" min="1" inputmode="decimal" class="form-control form-control-lg" value="{{ old('valor_cuota') }}"></div>
+            <div class="col-6" id="boxTotal"><label class="form-label fw-semibold">Monto total *</label>
+                <input name="monto_total" id="montoTotal" type="number" step="any" min="1" inputmode="decimal" class="form-control form-control-lg" value="{{ old('monto_total') }}"></div>
             <div class="col-6"><label class="form-label fw-semibold">N.º de cuotas *</label>
                 <input name="num_cuotas" id="cuotas" type="number" min="1" class="form-control form-control-lg" required value="{{ old('num_cuotas', 20) }}"></div>
             <div class="col-6"><label class="form-label fw-semibold">Frecuencia *</label>
@@ -36,21 +43,28 @@
                         <option value="{{ $k }}" @selected(old('frecuencia', 'diario') === $k)>{{ $v }}</option>
                     @endforeach
                 </select></div>
-            <div class="col-6"><label class="form-label fw-semibold">Primera cuota *</label>
+            <div class="col-12"><label class="form-label fw-semibold">Primera cuota *</label>
                 <input name="fecha_inicio" id="inicio" type="date" class="form-control form-control-lg" required value="{{ old('fecha_inicio', today()->addDay()->toDateString()) }}"></div>
-            <div class="col-6 d-flex align-items-end" id="boxDomingo">
-                <div class="form-check form-switch fs-6 mb-2">
-                    <input type="hidden" name="saltar_domingos" value="0">
-                    <input class="form-check-input" type="checkbox" role="switch" name="saltar_domingos" value="1" id="domingos" @checked(old('saltar_domingos', true))>
-                    <label class="form-check-label" for="domingos">Saltar domingos</label>
+            <div class="col-12" id="boxDomingo">
+                <div class="d-flex gap-4 flex-wrap">
+                    <div class="form-check form-switch fs-6">
+                        <input type="hidden" name="saltar_domingos" value="0">
+                        <input class="form-check-input" type="checkbox" role="switch" name="saltar_domingos" value="1" id="domingos" @checked(old('saltar_domingos', true))>
+                        <label class="form-check-label" for="domingos">Saltar domingos</label>
+                    </div>
+                    <div class="form-check form-switch fs-6">
+                        <input type="hidden" name="saltar_festivos" value="0">
+                        <input class="form-check-input" type="checkbox" role="switch" name="saltar_festivos" value="1" id="festivos" @checked(old('saltar_festivos', true))>
+                        <label class="form-check-label" for="festivos">Saltar festivos</label>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="rounded-4 p-3 mt-4 text-white" style="background:var(--brand-grad)">
             <div class="row text-center">
-                <div class="col-4"><div class="small opacity-75">Cuota</div><div class="fs-5 fw-bold" id="pvCuota">$0</div></div>
-                <div class="col-4"><div class="small opacity-75">Total a pagar</div><div class="fs-5 fw-bold" id="pvTotal">$0</div></div>
+                <div class="col-4"><div class="small opacity-75">Monto total</div><div class="fs-6 fw-bold text-nowrap" id="pvTotal">$0</div></div>
+                <div class="col-4"><div class="small opacity-75">Cuota</div><div class="fs-6 fw-bold text-nowrap" id="pvCuota">$0</div></div>
                 <div class="col-4"><div class="small opacity-75">Última cuota</div><div class="fs-6 fw-bold" id="pvFin">—</div></div>
             </div>
         </div>
@@ -68,29 +82,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const cajas = @json($cajas), bloquear = @json($bloquear), usarBase = @json($usarBase), yo = {{ auth()->id() }};
     const $ = (id) => document.getElementById(id);
 
-    function fechaFinal(inicio, n, frec, saltar) {
-        let d = new Date(inicio + 'T00:00:00');
-        saltar = saltar && frec === 'diario';
-        if (saltar && d.getDay() === 0) d.setDate(d.getDate() + 1);
+    const festivos = new Set(@json($festivos));
+    const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+    // Solo préstamos diarios saltan domingos y festivos
+    function ajustar(d, frec, dom, fest) {
+        if (frec !== 'diario') return d;
+        while ((dom && d.getDay() === 0) || (fest && festivos.has(iso(d)))) d.setDate(d.getDate() + 1);
+        return d;
+    }
+
+    function fechaFinal(inicio, n, frec, dom, fest) {
+        let d = ajustar(new Date(inicio + 'T00:00:00'), frec, dom, fest);
         for (let i = 1; i < n; i++) {
             if (frec === 'diario') d.setDate(d.getDate() + 1);
             else if (frec === 'semanal') d.setDate(d.getDate() + 7);
             else if (frec === 'quincenal') d.setDate(d.getDate() + 15);
             else { const dia = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + 1);
                    const max = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(dia, max)); }
-            if (saltar && d.getDay() === 0) d.setDate(d.getDate() + 1);
+            ajustar(d, frec, dom, fest);
         }
         return d;
     }
 
     function actualizar() {
-        const monto = parseFloat($('monto').value) || 0, int = parseFloat($('interes').value) || 0;
         const n = parseInt($('cuotas').value) || 1, frec = $('frecuencia').value;
-        const total = monto * (1 + int / 100);
-        $('pvTotal').textContent = money(total);
-        $('pvCuota').textContent = money(Math.round(total / n));
-        $('boxDomingo').style.visibility = frec === 'diario' ? 'visible' : 'hidden';
-        if ($('inicio').value) $('pvFin').textContent = fechaFinal($('inicio').value, n, frec, $('domingos').checked)
+        const porTotal = $('modoTotal').checked;
+        $('boxCuota').style.display = porTotal ? 'none' : '';
+        $('boxTotal').style.display = porTotal ? '' : 'none';
+        $('valorCuota').required = !porTotal;
+        $('montoTotal').required = porTotal;
+        // por cuota: monto = cuota × n.º de cuotas · por monto total: cuota = monto ÷ n.º de cuotas
+        const monto = porTotal ? (parseFloat($('montoTotal').value) || 0) : (parseFloat($('valorCuota').value) || 0) * n;
+        const cuota = porTotal ? Math.round(monto / n) : (parseFloat($('valorCuota').value) || 0);
+        $('pvTotal').textContent = money(monto);
+        $('pvCuota').textContent = money(cuota);
+        $('boxDomingo').style.display = frec === 'diario' ? '' : 'none';
+        if ($('inicio').value) $('pvFin').textContent = fechaFinal($('inicio').value, n, frec, $('domingos').checked, $('festivos').checked)
             .toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
 
         const opt = $('cliente').selectedOptions[0];

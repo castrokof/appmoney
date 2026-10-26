@@ -17,6 +17,7 @@
                     <div class="fw-bold">{{ $c->nombre_completo }}</div>
                     @include('partials.calificacion', ['cal' => $cals[$c->id] ?? null])
                     <div class="small text-secondary">{{ $c->telefono }} · {{ $p->cuotas_atrasadas_calc }} cuota(s) atrasada(s)</div>
+                    @include('partials.cuota-actual', ['p' => $p])
                 </div>
                 <div class="text-end">
                     <div class="fs-5 fw-bolder text-danger">${{ number_format($p->atrasado_calc, 0, ',', '.') }}</div>

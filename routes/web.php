@@ -17,6 +17,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('clientes', ClienteController::class)->except('show');
 
     Route::resource('prestamos', PrestamoController::class)->only(['index', 'create', 'store', 'show']);
+    Route::post('prestamos/{prestamo}/renovar', [PrestamoController::class, 'renovar'])->name('prestamos.renovar');
     Route::post('prestamos/{prestamo}/anular', [PrestamoController::class, 'anular'])->name('prestamos.anular');
     Route::patch('cuotas/{cuota}/fecha', [PrestamoController::class, 'moverCuota'])->name('cuotas.fecha');
 

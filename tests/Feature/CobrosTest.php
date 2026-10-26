@@ -38,9 +38,9 @@ class CobrosTest extends TestCase
         $cliente = Cliente::create(['user_id' => $u->id, 'nombres' => 'Ana']);
 
         return app(PrestamoService::class)->crear($over + [
-            'user_id' => $u->id, 'cliente_id' => $cliente->id, 'monto' => 100000,
-            'interes_pct' => 20, 'num_cuotas' => 10, 'frecuencia' => 'diario',
-            'saltar_domingos' => true, 'fecha_inicio' => '2026-01-04', // domingo
+            'user_id' => $u->id, 'cliente_id' => $cliente->id,
+            'valor_cuota' => 12000, 'num_cuotas' => 10, 'frecuencia' => 'diario',
+            'saltar_domingos' => true, 'saltar_festivos' => false, 'fecha_inicio' => '2026-01-04', // domingo
         ]);
     }
 
@@ -58,16 +58,85 @@ class CobrosTest extends TestCase
 
     public function test_cuotas_mensuales_suman_un_mes(): void
     {
-        $p = $this->prestamo($this->cobrador(), ['frecuencia' => 'mensual', 'num_cuotas' => 3, 'fecha_inicio' => '2026-01-31']);
+        $p = $this->prestamo($this->cobrador(), ['frecuencia' => 'mensual', 'num_cuotas' => 3, 'fecha_inicio' => '2026-01-31', 'saltar_festivos' => false]);
 
         $this->assertSame(['2026-01-31', '2026-02-28', '2026-03-28'], $p->cuotas->map(fn ($c) => $c->fecha->toDateString())->all());
     }
 
-    public function test_ultima_cuota_ajusta_el_redondeo(): void
+    public function test_monto_y_total_son_cuota_por_numero_de_cuotas(): void
     {
-        $p = $this->prestamo($this->cobrador(), ['monto' => 100000, 'interes_pct' => 10, 'num_cuotas' => 3, 'frecuencia' => 'semanal']);
+        $p = $this->prestamo($this->cobrador(), ['valor_cuota' => 8500, 'num_cuotas' => 7, 'frecuencia' => 'semanal']);
 
-        $this->assertSame(110000.0, (float) $p->cuotas->sum('valor'));
+        $this->assertSame(59500.0, (float) $p->monto);
+        $this->assertSame(59500.0, (float) $p->monto_total);
+        $this->assertSame(59500.0, (float) $p->cuotas->sum('valor'));
+    }
+
+    public function test_festivos_de_colombia_2026(): void
+    {
+        $esperados = ['2026-01-01', '2026-01-12', '2026-03-23', '2026-04-02', '2026-04-03', '2026-05-01', '2026-05-18',
+            '2026-06-08', '2026-06-15', '2026-06-29', '2026-07-20', '2026-08-07', '2026-08-17', '2026-10-12',
+            '2026-11-02', '2026-11-16', '2026-12-08', '2026-12-25'];
+
+        $this->assertSame($esperados, array_keys(\App\Support\FestivosColombia::deAnio(2026)));
+    }
+
+    public function test_diario_salta_domingos_y_festivos_pero_los_demas_no(): void
+    {
+        $u = $this->cobrador();
+
+        // 1 ene 2026 (festivo, jueves) → arranca el viernes 2; salta sáb? no: sábado se cobra; domingo 4 se salta
+        $d = $this->prestamo($u, ['fecha_inicio' => '2026-01-01', 'num_cuotas' => 5, 'saltar_festivos' => true]);
+        $this->assertSame(['2026-01-02', '2026-01-03', '2026-01-05', '2026-01-06', '2026-01-07'],
+            $d->cuotas->map(fn ($c) => $c->fecha->toDateString())->all());
+
+        // Con festivos activos, el 12 ene (lunes festivo) se omite
+        $e = $this->prestamo($u, ['fecha_inicio' => '2026-01-10', 'num_cuotas' => 3, 'saltar_festivos' => true]);
+        $this->assertSame(['2026-01-10', '2026-01-13', '2026-01-14'], $e->cuotas->map(fn ($c) => $c->fecha->toDateString())->all());
+
+        // Sin saltar festivos, el 12 ene sí se cobra
+        $f = $this->prestamo($u, ['fecha_inicio' => '2026-01-10', 'num_cuotas' => 3, 'saltar_festivos' => false]);
+        $this->assertSame(['2026-01-10', '2026-01-12', '2026-01-13'], $f->cuotas->map(fn ($c) => $c->fecha->toDateString())->all());
+
+        // Semanal: no aplica ninguna exclusión (1 ene es festivo y se mantiene)
+        $g = $this->prestamo($u, ['fecha_inicio' => '2026-01-01', 'num_cuotas' => 2, 'frecuencia' => 'semanal', 'saltar_festivos' => true, 'saltar_domingos' => true]);
+        $this->assertSame(['2026-01-01', '2026-01-08'], $g->cuotas->map(fn ($c) => $c->fecha->toDateString())->all());
+    }
+
+    public function test_renovar_solo_prestamos_pagados_y_copia_condiciones(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u, ['saltar_festivos' => true]);
+
+        $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
+            'valor_cuota' => 12000, 'num_cuotas' => 10, 'fecha_inicio' => today()->addDay()->toDateString(),
+        ])->assertStatus(422); // sigue activo
+
+        app(PagoService::class)->aplicar($p, 120000, today()->toDateString(), $u->id);
+        $this->assertSame('pagado', $p->fresh()->estado);
+
+        $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
+            'valor_cuota' => 15000, 'num_cuotas' => 8, 'fecha_inicio' => today()->addDay()->toDateString(),
+        ])->assertRedirect();
+
+        $nuevo = Prestamo::where('cliente_id', $p->cliente_id)->where('id', '!=', $p->id)->firstOrFail();
+        $this->assertSame('activo', $nuevo->estado);
+        $this->assertSame(120000.0, (float) $nuevo->monto_total);
+        $this->assertSame('diario', $nuevo->frecuencia);
+        $this->assertTrue($nuevo->saltar_festivos);
+        $this->assertCount(8, $nuevo->cuotas);
+    }
+
+    public function test_cobrador_ajeno_no_puede_renovar(): void
+    {
+        $a = $this->cobrador();
+        $b = $this->cobrador();
+        $p = $this->prestamo($a);
+        app(PagoService::class)->aplicar($p, 120000, today()->toDateString(), $a->id);
+
+        $this->actingAs($b)->post(route('prestamos.renovar', $p->id), [
+            'valor_cuota' => 1000, 'num_cuotas' => 2, 'fecha_inicio' => today()->toDateString(),
+        ])->assertNotFound();
     }
 
     public function test_pago_exacto_marca_pagada_y_abono_deja_parcial(): void
@@ -132,22 +201,22 @@ class CobrosTest extends TestCase
         app(PagoService::class)->aplicar($p, 20000, today()->toDateString(), $u->id);
 
         $caja = app(\App\Services\CajaService::class);
-        $this->assertSame(60000.0, $caja->caja($u->id)); // 150k - 100k + 20k - 10k
+        $this->assertSame(40000.0, $caja->caja($u->id)); // 150k - 120k + 20k - 10k
 
         $this->expectException(ValidationException::class);
-        $this->prestamo($u, ['monto' => 80000]);
+        $this->prestamo($u, ['valor_cuota' => 8000]); // 80.000 > caja restante
     }
 
     public function test_anular_devuelve_el_monto_a_la_caja(): void
     {
-        $u = $this->cobrador(100000);
+        $u = $this->cobrador(120000);
         $p = $this->prestamo($u);
         $caja = app(\App\Services\CajaService::class);
         $this->assertSame(0.0, $caja->caja($u->id));
 
         app(PrestamoService::class)->anular($p);
 
-        $this->assertSame(100000.0, $caja->caja($u->id));
+        $this->assertSame(120000.0, $caja->caja($u->id));
     }
 
     public function test_cobrador_no_ve_ni_paga_prestamos_ajenos(): void
@@ -264,7 +333,7 @@ class CobrosTest extends TestCase
         config(['cobros.usar_base' => false]);
         $u = $this->cobrador(0); // sin base entregada
 
-        $p = $this->prestamo($u, ['monto' => 5000000]); // se puede prestar sin base
+        $p = $this->prestamo($u, ['valor_cuota' => 500000]); // 5.000.000 sin base: se puede
         $this->assertSame(10, $p->cuotas()->count());
 
         $this->actingAs($u)->get(route('hoy'))->assertOk()->assertDontSee('Caja disponible');
@@ -274,5 +343,45 @@ class CobrosTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $this->actingAs($admin)->get(route('bases.index'))->assertNotFound();
         $this->actingAs($admin)->get(route('resumen'))->assertOk()->assertDontSee('>Caja<', false);
+    }
+
+    public function test_calcular_por_monto_total_divide_entre_las_cuotas(): void
+    {
+        $u = $this->cobrador();
+        $cliente = Cliente::create(['user_id' => $u->id, 'nombres' => 'Beto']);
+
+        $p = app(PrestamoService::class)->crear([
+            'user_id' => $u->id, 'cliente_id' => $cliente->id, 'monto_total' => 100000,
+            'num_cuotas' => 3, 'frecuencia' => 'semanal', 'fecha_inicio' => '2026-03-02',
+        ]);
+
+        $this->assertSame(100000.0, (float) $p->monto_total);
+        $this->assertSame(33333.0, (float) $p->valor_cuota);
+        $this->assertSame([33333.0, 33333.0, 33334.0], $p->cuotas->map(fn ($c) => (float) $c->valor)->all());
+    }
+
+    public function test_formulario_crea_prestamo_en_ambos_modos_sin_descripcion(): void
+    {
+        $u = $this->cobrador();
+        $cliente = Cliente::create(['user_id' => $u->id, 'nombres' => 'Carla']);
+        $base = ['cliente_id' => $cliente->id, 'num_cuotas' => 4, 'frecuencia' => 'semanal', 'fecha_inicio' => today()->addDay()->toDateString()];
+
+        $this->actingAs($u)->post(route('prestamos.store'), $base + ['modo' => 'cuota', 'valor_cuota' => 25000])->assertRedirect();
+        $this->actingAs($u)->post(route('prestamos.store'), $base + ['modo' => 'total', 'monto_total' => 80000])->assertRedirect();
+        $this->actingAs($u)->post(route('prestamos.store'), $base + ['modo' => 'total'])->assertSessionHasErrors('monto_total');
+
+        $this->assertSame([100000.0, 80000.0], Prestamo::orderBy('id')->pluck('monto_total')->map(fn ($v) => (float) $v)->all());
+        $this->actingAs($u)->get(route('prestamos.create'))->assertOk()->assertDontSee('name="descripcion"', false);
+    }
+
+    public function test_listado_muestra_en_que_cuota_va(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u, ['fecha_inicio' => today()->subDays(3)->toDateString(), 'saltar_domingos' => false]);
+        app(PagoService::class)->aplicar($p, 24000, today()->toDateString(), $u->id); // 2 cuotas
+
+        $this->assertSame(3, Prestamo::conTotales()->find($p->id)->cuota_actual);
+        $this->actingAs($u)->get(route('prestamos.index'))->assertSee('Cuota 3/10');
+        $this->actingAs($u)->get(route('hoy'))->assertSee('Cuota 3/10');
     }
 }

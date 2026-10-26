@@ -11,8 +11,8 @@ class Prestamo extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'cliente_id', 'descripcion', 'monto', 'interes_pct', 'monto_total',
-        'num_cuotas', 'valor_cuota', 'frecuencia', 'saltar_domingos', 'fecha_inicio', 'estado',
+        'user_id', 'cliente_id', 'monto', 'interes_pct', 'monto_total',
+        'num_cuotas', 'valor_cuota', 'frecuencia', 'saltar_domingos', 'saltar_festivos', 'fecha_inicio', 'estado',
     ];
 
     protected $casts = [
@@ -21,6 +21,7 @@ class Prestamo extends Model
         'monto_total' => 'decimal:2',
         'valor_cuota' => 'decimal:2',
         'saltar_domingos' => 'boolean',
+        'saltar_festivos' => 'boolean',
         'fecha_inicio' => 'date',
     ];
 
@@ -61,9 +62,21 @@ class Prestamo extends Model
                 ->where('estado', 'pendiente')->where('fecha', '<', $hoy),
             'cuotas_atrasadas_calc' => $base()->selectRaw('COUNT(*)')
                 ->where('estado', 'pendiente')->where('fecha', '<', $hoy),
+            // Cuota en la que va: la primera pendiente (null si ya pagó todas)
+            'cuota_actual_calc' => $base()->selectRaw('MIN(numero)')->where('estado', 'pendiente'),
             'hoy_calc' => $base()->selectRaw('COALESCE(SUM(valor - pagado), 0)')
                 ->where('estado', 'pendiente')->where('fecha', '<=', $hoy),
         ]);
+    }
+
+    /** Número de la cuota en la que va (la próxima por pagar) o null si ya está al día completo. */
+    public function getCuotaActualAttribute(): ?int
+    {
+        $n = array_key_exists('cuota_actual_calc', $this->attributes)
+            ? $this->attributes['cuota_actual_calc']
+            : $this->cuotas()->where('estado', 'pendiente')->min('numero');
+
+        return $n === null ? null : (int) $n;
     }
 
     public function getSaldoAttribute(): float

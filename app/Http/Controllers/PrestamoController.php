@@ -56,6 +56,7 @@ class PrestamoController extends Controller
             'cals' => $calificacion->paraClientes($clientes->pluck('id')->all()),
             'bloquear' => config('cobros.bloquear_sin_base'),
             'usarBase' => config('cobros.usar_base'),
+            'festivos' => \App\Support\FestivosColombia::rango(today()->year, today()->year + 3),
             'clienteId' => request('cliente_id'),
         ]);
     }
@@ -64,21 +65,29 @@ class PrestamoController extends Controller
     {
         $data = $request->validate([
             'cliente_id' => 'required|integer|exists:clientes,id',
-            'descripcion' => 'nullable|string|max:255',
-            'monto' => 'required|numeric|min:1|max:9999999999',
-            'interes_pct' => 'required|numeric|min:0|max:999',
+            'modo' => 'required|in:cuota,total',
+            'valor_cuota' => 'required_if:modo,cuota|nullable|numeric|min:1|max:999999999',
+            'monto_total' => 'required_if:modo,total|nullable|numeric|min:1|max:9999999999',
             'num_cuotas' => 'required|integer|min:1|max:520',
             'frecuencia' => ['required', Rule::in(Prestamo::FRECUENCIAS)],
             'saltar_domingos' => 'nullable|boolean',
+            'saltar_festivos' => 'nullable|boolean',
             'fecha_inicio' => 'required|date',
         ]);
 
         $cliente = Cliente::findOrFail($data['cliente_id']);
         $this->autorizar($cliente);
 
+        if ($data['modo'] === 'cuota') {
+            unset($data['monto_total']);
+        } else {
+            unset($data['valor_cuota']);
+        }
+
         // El préstamo queda a nombre del cobrador dueño del cliente
         $data['user_id'] = $cliente->user_id;
         $data['saltar_domingos'] = $request->boolean('saltar_domingos');
+        $data['saltar_festivos'] = $request->boolean('saltar_festivos');
 
         $prestamo = $service->crear($data);
 
@@ -93,6 +102,32 @@ class PrestamoController extends Controller
         $cal = $calificacion->paraCliente($prestamo->cliente_id);
 
         return view('prestamos.show', compact('prestamo', 'cal'));
+    }
+
+    /** Renueva un préstamo pagado: crea uno nuevo con las mismas condiciones (editables). */
+    public function renovar(Request $request, int $id, PrestamoService $service)
+    {
+        $anterior = Prestamo::findOrFail($id);
+        $this->autorizar($anterior);
+
+        abort_unless($anterior->estado === 'pagado', 422, 'Solo se renuevan préstamos pagados.');
+
+        $data = $request->validate([
+            'valor_cuota' => 'required|numeric|min:1|max:999999999',
+            'num_cuotas' => 'required|integer|min:1|max:520',
+            'fecha_inicio' => 'required|date',
+        ]);
+
+        $nuevo = $service->crear($data + [
+            'user_id' => $anterior->user_id,
+            'cliente_id' => $anterior->cliente_id,
+            'frecuencia' => $anterior->frecuencia,
+            'saltar_domingos' => $anterior->saltar_domingos,
+            'saltar_festivos' => $anterior->saltar_festivos,
+        ]);
+
+        return redirect()->route('prestamos.show', $nuevo->id)
+            ->with('ok', 'Préstamo renovado: '.$nuevo->num_cuotas.' cuotas de $'.number_format($nuevo->valor_cuota, 0, ',', '.').'.');
     }
 
     public function anular(int $id, PrestamoService $service)

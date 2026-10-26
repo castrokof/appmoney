@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('title', $prestamo->cliente->nombre_completo)
-@section('subtitle', ($prestamo->descripcion ?: 'Préstamo #'.$prestamo->id).' · '.ucfirst($prestamo->estado))
+@section('subtitle', 'Préstamo #'.$prestamo->id.' · '.ucfirst($prestamo->estado))
 @section('content')
     @php $badge = ['pagada' => 'badge-soft-success', 'atrasada' => 'badge-soft-danger', 'parcial' => 'badge-soft-warning', 'pendiente' => 'badge-soft-secondary']; @endphp
 
@@ -12,7 +12,7 @@
     </div>
 
     <div class="card card-soft mb-3"><div class="card-body small">
-        <div><strong>Prestado:</strong> ${{ number_format($prestamo->monto, 0, ',', '.') }} al {{ rtrim(rtrim($prestamo->interes_pct, '0'), '.') }}% · {{ $prestamo->num_cuotas }} cuotas {{ $prestamo->frecuencia }}s desde {{ $prestamo->fecha_inicio->format('d/m/Y') }}</div>
+        <div><strong>Préstamo:</strong> ${{ number_format($prestamo->monto_total, 0, ',', '.') }} = {{ $prestamo->num_cuotas }} cuotas de ${{ number_format($prestamo->valor_cuota, 0, ',', '.') }} {{ $prestamo->frecuencia }}s desde {{ $prestamo->fecha_inicio->format('d/m/Y') }}</div>
         <div><strong>Calificación del cliente:</strong> @include('partials.calificacion', ['cal' => $cal])
             @if ($cal['atrasadas'] > 0)<span class="text-danger">· {{ $cal['atrasadas'] }} cuota(s) atrasada(s), la más vieja hace {{ $cal['dias_max'] }} día(s)</span>@endif</div>
         <div><strong>Cobrador:</strong> {{ $prestamo->user->name }} · <strong>Tel:</strong> {{ $prestamo->cliente->telefono ?: '—' }}</div>
@@ -26,7 +26,47 @@
                 </form>
             </div>
         @endif
+        @if ($prestamo->estado === 'pagado')
+            <button class="btn btn-primary btn-cobrar w-100 mt-3" data-bs-toggle="modal" data-bs-target="#modalRenovar">
+                <i class="bi bi-arrow-repeat"></i> Renovar préstamo
+            </button>
+        @endif
     </div></div>
+
+    @if ($prestamo->estado === 'pagado')
+    <div class="modal fade" id="modalRenovar" tabindex="-1"><div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ route('prestamos.renovar', $prestamo->id) }}" class="modal-content">
+            @csrf
+            <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold">Renovar préstamo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p class="small text-secondary">Se crea un préstamo nuevo para {{ $prestamo->cliente->nombre_completo }} con las mismas condiciones ({{ $prestamo->frecuencia }}{{ $prestamo->saltar_domingos ? ', sin domingos' : '' }}{{ $prestamo->saltar_festivos ? ', sin festivos' : '' }}). Puedes ajustar los valores.</p>
+                <div class="row g-2">
+                    <div class="col-6"><label class="form-label fw-semibold">Valor de la cuota</label>
+                        <input name="valor_cuota" id="rCuota" type="number" step="any" min="1" class="form-control form-control-lg" required value="{{ (float) $prestamo->valor_cuota }}"></div>
+                    <div class="col-6"><label class="form-label fw-semibold">N.º de cuotas</label>
+                        <input name="num_cuotas" id="rN" type="number" min="1" class="form-control form-control-lg" required value="{{ $prestamo->num_cuotas }}"></div>
+                    <div class="col-12"><label class="form-label fw-semibold">Primera cuota</label>
+                        <input name="fecha_inicio" type="date" class="form-control" required value="{{ today()->addDay()->toDateString() }}"></div>
+                </div>
+                <div class="rounded-4 p-3 mt-3 text-white text-center" style="background:var(--brand-grad)">
+                    <div class="small opacity-75">Monto del nuevo préstamo</div><div class="fs-4 fw-bold" id="rTotal">$0</div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0"><button class="btn btn-success btn-lg w-100 fw-bold">Renovar ahora</button></div>
+        </form>
+    </div></div>
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const f = () => document.getElementById('rTotal').textContent =
+                money((parseFloat(document.getElementById('rCuota').value) || 0) * (parseInt(document.getElementById('rN').value) || 0));
+            ['rCuota', 'rN'].forEach(id => document.getElementById(id).addEventListener('input', f));
+            f();
+        });
+    </script>
+    @endpush
+    @endif
 
     <h2 class="h6 fw-bold text-uppercase text-secondary mt-4">Cuotas</h2>
     <div class="card card-soft mb-3"><div class="table-responsive"><table class="table table-sm align-middle mb-0">
