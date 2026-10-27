@@ -67,6 +67,7 @@
                     </div>
                 </div>
                 <div class="text-danger small mt-2 d-none" id="rError">El monto a prestar debe cubrir el saldo pendiente.</div>
+                <div class="text-danger small mt-2 d-none" id="rErrorTotal">El monto a prestar no puede ser mayor al total que debe el cliente.</div>
             </div>
             <div class="modal-footer border-0 pt-0"><button class="btn btn-success btn-lg w-100 fw-bold" id="rBtn">Renovar ahora</button></div>
         </form>
@@ -86,8 +87,11 @@
                 $('rDebe').textContent = money(debe);
                 $('rFormula').textContent = n + ' cuotas de ' + money(cuota);
                 const corto = monto < saldo;
+                const exceso = monto > debe; // lo que se entrega no puede superar lo que el cliente debe devolver
                 $('rError').classList.toggle('d-none', !corto);
-                $('rBtn').disabled = corto || monto <= 0 || debe <= 0;
+                $('rErrorTotal').classList.toggle('d-none', !exceso);
+                $('rDebe').classList.toggle('text-warning', exceso);
+                $('rBtn').disabled = corto || exceso || monto <= 0 || debe <= 0;
             };
             ['rMonto', 'rN', 'rCuota'].forEach((id) => $(id).addEventListener('input', f));
             f();

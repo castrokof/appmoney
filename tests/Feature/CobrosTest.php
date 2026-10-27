@@ -659,11 +659,45 @@ class CobrosTest extends TestCase
         app(PagoService::class)->aplicar($p, 120000, today()->toDateString(), $u->id);
 
         $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
-            'monto' => 100000, 'valor_cuota' => 33333, 'num_cuotas' => 3, 'fecha_inicio' => today()->addDay()->toDateString(),
+            'monto' => 90000, 'valor_cuota' => 33333, 'num_cuotas' => 3, 'fecha_inicio' => today()->addDay()->toDateString(),
         ])->assertRedirect();
 
         $nuevo = Prestamo::where('renovado_de_id', $p->id)->firstOrFail();
         $this->assertSame(99999.0, (float) $nuevo->monto_total);
         $this->assertSame([33333.0, 33333.0, 33333.0], $nuevo->cuotas->map(fn ($c) => (float) $c->valor)->all());
+    }
+
+    public function test_el_monto_a_prestar_no_puede_superar_el_total_que_debe_el_cliente(): void
+    {
+        $u = $this->cobrador();
+        $p = $this->prestamo($u, ['fecha_inicio' => today()->subDays(2)->toDateString(), 'saltar_domingos' => false]);
+        app(PagoService::class)->aplicar($p, 84000, today()->toDateString(), $u->id); // saldo 36.000
+
+        // Presta 200.000 pero el cliente solo debe 10 × 15.000 = 150.000 → rechazado, sin efectos
+        $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
+            'monto' => 200000, 'valor_cuota' => 15000, 'num_cuotas' => 10, 'fecha_inicio' => today()->addDay()->toDateString(),
+        ])->assertSessionHasErrors('monto');
+
+        $this->assertSame(1, Prestamo::count());
+        $this->assertSame('activo', $p->fresh()->estado);
+        $this->assertSame(0, $p->pagos()->where('renovacion', true)->count());
+
+        // Igual al total sí se permite (no gana nada, pero no supera)
+        $this->actingAs($u)->post(route('prestamos.renovar', $p->id), [
+            'monto' => 150000, 'valor_cuota' => 15000, 'num_cuotas' => 10, 'fecha_inicio' => today()->addDay()->toDateString(),
+        ])->assertRedirect();
+        $this->assertSame(2, Prestamo::count());
+    }
+
+    public function test_crear_un_prestamo_con_monto_mayor_al_total_se_rechaza_en_el_servicio(): void
+    {
+        $u = $this->cobrador();
+        $cliente = Cliente::create(['user_id' => $u->id, 'nombres' => 'Eva']);
+
+        $this->expectException(ValidationException::class);
+        app(PrestamoService::class)->crear([
+            'user_id' => $u->id, 'cliente_id' => $cliente->id, 'monto' => 500000,
+            'valor_cuota' => 10000, 'num_cuotas' => 10, 'frecuencia' => 'semanal', 'fecha_inicio' => today()->toDateString(),
+        ]);
     }
 }

@@ -36,6 +36,13 @@ class PrestamoService
         // Lo que se entrega (sale del bolsillo): igual al total, salvo en una renovación donde se fija a mano
         $monto = isset($data['monto']) ? round((float) $data['monto'], 2) : $total;
 
+        // Lo que se entrega nunca puede superar lo que el cliente debe devolver
+        if ($monto > $total) {
+            throw ValidationException::withMessages([
+                'monto' => 'El monto a prestar ('.AuditoriaService::dinero($monto).') no puede ser mayor al total que debe el cliente ('.AuditoriaService::dinero($total).').',
+            ]);
+        }
+
         if (config('cobros.usar_base') && config('cobros.bloquear_sin_base')) {
             $disponible = $this->caja->caja((int) $data['user_id']);
 
@@ -131,6 +138,13 @@ class PrestamoService
 
             $saldo = round((float) $anterior->cuotas()->sum(DB::raw('valor - pagado')), 2);
             $nuevoMonto = round((float) $data['monto'], 2);
+            $totalDebe = $this->total((float) $data['valor_cuota'], (int) $data['num_cuotas']);
+
+            if ($nuevoMonto > $totalDebe) {
+                throw ValidationException::withMessages([
+                    'monto' => 'El monto a prestar ('.AuditoriaService::dinero($nuevoMonto).') no puede ser mayor al total que debe el cliente ('.AuditoriaService::dinero($totalDebe).').',
+                ]);
+            }
 
             if ($nuevoMonto < $saldo) {
                 throw ValidationException::withMessages([
