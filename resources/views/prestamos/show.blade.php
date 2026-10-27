@@ -12,7 +12,7 @@
     </div>
 
     <div class="card card-soft mb-3"><div class="card-body small">
-        <div><strong>Préstamo:</strong> ${{ number_format($prestamo->monto_total, 0, ',', '.') }} = {{ $prestamo->num_cuotas }} cuotas de ${{ number_format($prestamo->valor_cuota, 0, ',', '.') }} {{ $prestamo->frecuencia }}s desde {{ $prestamo->fecha_inicio->format('d/m/Y') }}</div>
+        <div>@if ((float) $prestamo->monto !== (float) $prestamo->monto_total)<strong>Prestado:</strong> ${{ number_format($prestamo->monto, 0, ',', '.') }} · @endif<strong>Debe:</strong> ${{ number_format($prestamo->monto_total, 0, ',', '.') }} = {{ $prestamo->num_cuotas }} cuotas de ${{ number_format($prestamo->valor_cuota, 0, ',', '.') }} {{ $prestamo->frecuencia }}s desde {{ $prestamo->fecha_inicio->format('d/m/Y') }}</div>
         <div><strong>Calificación del cliente:</strong> @include('partials.calificacion', ['cal' => $cal])
             @if ($cal['atrasadas'] > 0)<span class="text-danger">· {{ $cal['atrasadas'] }} cuota(s) atrasada(s), la más vieja hace {{ $cal['dias_max'] }} día(s)</span>@endif</div>
         @if ($prestamo->renovado_de_id)<div><strong>Renovación del préstamo</strong> <a href="{{ route('prestamos.show', $prestamo->renovado_de_id) }}">#{{ $prestamo->renovado_de_id }}</a></div>@endif
@@ -46,23 +46,27 @@
                     <div class="alert alert-warning py-2 small">Este préstamo aún tiene <strong>${{ number_format($prestamo->saldo_calc, 0, ',', '.') }}</strong> pendientes. Se descuentan del nuevo préstamo y al cliente se le entrega la diferencia.</div>
                 @endif
                 <div class="row g-2">
-                    <div class="col-12"><label class="form-label fw-semibold">Monto a prestar de nuevo</label>
-                        <input name="monto" id="rMonto" type="number" step="any" min="1" inputmode="decimal" class="form-control form-control-lg" required value="{{ (float) $prestamo->monto_total }}"></div>
+                    <div class="col-12"><label class="form-label fw-semibold">Monto a prestar</label>
+                        <input name="monto" id="rMonto" type="number" step="any" min="1" inputmode="decimal" class="form-control form-control-lg" required value="{{ (float) $prestamo->monto }}">
+                        <div class="form-text">Lo que vas a prestar. De este valor se resta el saldo pendiente.</div></div>
                     <div class="col-6"><label class="form-label fw-semibold">N.º de cuotas</label>
                         <input name="num_cuotas" id="rN" type="number" min="1" class="form-control form-control-lg" required value="{{ $prestamo->num_cuotas }}"></div>
                     <div class="col-6"><label class="form-label fw-semibold">Valor de la cuota</label>
                         <input name="valor_cuota" id="rCuota" type="number" step="any" min="1" inputmode="decimal" class="form-control form-control-lg" required value="{{ (float) $prestamo->valor_cuota }}"></div>
                     <div class="col-12"><label class="form-label fw-semibold">Primera cuota</label>
                         <input name="fecha_inicio" type="date" class="form-control" required value="{{ today()->addDay()->toDateString() }}"></div>
-                    <div class="col-12 small text-secondary">Al cambiar el monto o el n.º de cuotas, la cuota se recalcula; si cambias la cuota, se recalcula el monto.</div>
                 </div>
                 <div class="rounded-4 p-3 mt-3 text-white" style="background:var(--brand-grad)">
-                    <div class="d-flex justify-content-between"><span class="opacity-75">Monto del nuevo préstamo</span><strong id="rTotal">$0</strong></div>
+                    <div class="d-flex justify-content-between"><span class="opacity-75">Monto a prestar</span><strong id="rTotal">$0</strong></div>
                     <div class="d-flex justify-content-between"><span class="opacity-75">− Saldo pendiente actual</span><strong id="rSaldo">$0</strong></div>
-                    <hr class="my-2 opacity-50">
-                    <div class="d-flex justify-content-between fs-5"><span>Entregar al cliente</span><strong id="rEntregar">$0</strong></div>
+                    <div class="d-flex justify-content-between fs-5 mt-1"><span>Entregar al cliente</span><strong id="rEntregar">$0</strong></div>
+                    <hr class="my-2 opacity-75">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Total que debe el cliente<br><small class="opacity-75" id="rFormula">cuota × cuotas</small></span>
+                        <strong class="fs-4" id="rDebe">$0</strong>
+                    </div>
                 </div>
-                <div class="text-danger small mt-2 d-none" id="rError">El nuevo préstamo debe cubrir el saldo pendiente.</div>
+                <div class="text-danger small mt-2 d-none" id="rError">El monto a prestar debe cubrir el saldo pendiente.</div>
             </div>
             <div class="modal-footer border-0 pt-0"><button class="btn btn-success btn-lg w-100 fw-bold" id="rBtn">Renovar ahora</button></div>
         </form>
@@ -73,28 +77,19 @@
             const saldo = {{ (float) $prestamo->saldo_calc }};
             const $ = (id) => document.getElementById(id);
             const f = () => {
-                const nuevo = parseFloat($('rMonto').value) || 0;
-                $('rTotal').textContent = money(nuevo);
+                const monto = parseFloat($('rMonto').value) || 0;
+                const cuota = parseFloat($('rCuota').value) || 0, n = parseInt($('rN').value) || 0;
+                const debe = cuota * n; // lo que debe el cliente = cuota × n.º de cuotas
+                $('rTotal').textContent = money(monto);
                 $('rSaldo').textContent = money(saldo);
-                $('rEntregar').textContent = money(nuevo - saldo);
-                const corto = nuevo < saldo;
+                $('rEntregar').textContent = money(monto - saldo);
+                $('rDebe').textContent = money(debe);
+                $('rFormula').textContent = n + ' cuotas de ' + money(cuota);
+                const corto = monto < saldo;
                 $('rError').classList.toggle('d-none', !corto);
-                $('rBtn').disabled = corto || nuevo <= 0;
+                $('rBtn').disabled = corto || monto <= 0 || debe <= 0;
             };
-            // Monto, n.º de cuotas y valor de la cuota quedan enlazados
-            const desdeMonto = () => {
-                const n = parseInt($('rN').value) || 0, m = parseFloat($('rMonto').value) || 0;
-                if (n > 0) $('rCuota').value = Math.round(m / n);
-                f();
-            };
-            const desdeCuota = () => {
-                const n = parseInt($('rN').value) || 0, c = parseFloat($('rCuota').value) || 0;
-                $('rMonto').value = Math.round(c * n);
-                f();
-            };
-            $('rMonto').addEventListener('input', desdeMonto);
-            $('rN').addEventListener('input', desdeMonto);
-            $('rCuota').addEventListener('input', desdeCuota);
+            ['rMonto', 'rN', 'rCuota'].forEach((id) => $(id).addEventListener('input', f));
             f();
         });
     </script>

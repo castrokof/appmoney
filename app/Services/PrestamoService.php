@@ -22,7 +22,8 @@ class PrestamoService
 
     /**
      * Crea el préstamo y sus cuotas en una transacción.
-     * El monto del préstamo es valor_cuota × num_cuotas (o `monto` si se envía; la última cuota ajusta el redondeo).
+     * monto_total (lo que debe el cliente) = valor_cuota × num_cuotas.
+     * monto (lo prestado) = monto_total, o el `monto` enviado en una renovación.
      * $data: user_id, cliente_id, valor_cuota, num_cuotas, monto?, frecuencia,
      *        saltar_domingos?, saltar_festivos?, fecha_inicio
      */
@@ -30,8 +31,10 @@ class PrestamoService
     {
         $n = (int) $data['num_cuotas'];
         $valorCuota = (float) $data['valor_cuota'];
-        // Normalmente cuota × n.º de cuotas; en una renovación el monto puede fijarse a mano
-        $monto = isset($data['monto']) ? round((float) $data['monto'], 2) : $this->total($valorCuota, $n);
+        // Lo que debe el cliente siempre es cuota × n.º de cuotas
+        $total = $this->total($valorCuota, $n);
+        // Lo que se entrega (sale del bolsillo): igual al total, salvo en una renovación donde se fija a mano
+        $monto = isset($data['monto']) ? round((float) $data['monto'], 2) : $total;
 
         if (config('cobros.usar_base') && config('cobros.bloquear_sin_base')) {
             $disponible = $this->caja->caja((int) $data['user_id']);
@@ -43,7 +46,7 @@ class PrestamoService
             }
         }
 
-        return DB::transaction(function () use ($data, $monto, $valorCuota, $n) {
+        return DB::transaction(function () use ($data, $monto, $total, $valorCuota, $n) {
             $diario = $data['frecuencia'] === 'diario';
 
             $prestamo = Prestamo::create([
@@ -51,7 +54,7 @@ class PrestamoService
                 'cliente_id' => $data['cliente_id'],
                 'monto' => $monto,
                 'interes_pct' => 0, // ya no se usa
-                'monto_total' => $monto,
+                'monto_total' => $total,
                 'num_cuotas' => $n,
                 'valor_cuota' => $valorCuota,
                 'frecuencia' => $data['frecuencia'],
@@ -65,9 +68,9 @@ class PrestamoService
             $this->generarCuotas($prestamo);
 
             $this->auditoria->registrar('prestamo.creado',
-                'Préstamo de '.AuditoriaService::dinero($monto).' en '.$n.' cuotas de '.AuditoriaService::dinero($valorCuota).' ('.$prestamo->frecuencia.')',
+                'Préstamo de '.AuditoriaService::dinero($monto).' en '.$n.' cuotas de '.AuditoriaService::dinero($valorCuota).' ('.$prestamo->frecuencia.'), total a pagar '.AuditoriaService::dinero($total),
                 $prestamo->id, 'prestamo', $prestamo->id, null, null,
-                ['monto' => $monto, 'cuotas' => $n, 'valor_cuota' => $valorCuota, 'frecuencia' => $prestamo->frecuencia, 'cliente_id' => $prestamo->cliente_id]);
+                ['monto' => $monto, 'monto_total' => $total, 'cuotas' => $n, 'valor_cuota' => $valorCuota, 'frecuencia' => $prestamo->frecuencia, 'cliente_id' => $prestamo->cliente_id]);
 
             return $prestamo;
         });
@@ -111,7 +114,8 @@ class PrestamoService
     /**
      * Renueva un préstamo (pagado o con cuotas pendientes). El saldo pendiente del anterior se cancela
      * con el nuevo préstamo y al cliente se le entrega la diferencia (nuevo monto − saldo).
-     * $data: monto (lo que se vuelve a prestar), valor_cuota, num_cuotas, fecha_inicio.
+     * $data: monto (lo que se vuelve a prestar y de donde se resta el saldo), valor_cuota, num_cuotas, fecha_inicio.
+     * El total que debe el cliente es valor_cuota × num_cuotas.
      * Hereda cliente, frecuencia y opciones de fechas.
      *
      * @return array{prestamo: Prestamo, saldo: float, entregar: float}
@@ -156,10 +160,11 @@ class PrestamoService
                 $anterior->id, 'prestamo', $anterior->id, null,
                 ['estado' => $anterior->estado, 'saldo' => $saldo], ['estado' => 'pagado', 'renovado_en' => $nuevo->id]);
             $this->auditoria->registrar('prestamo.renovado',
-                'Renovación del préstamo #'.$anterior->id.': nuevo monto '.AuditoriaService::dinero($nuevoMonto)
-                    .', saldo descontado '.AuditoriaService::dinero($saldo).', entregado '.AuditoriaService::dinero($entregar),
+                'Renovación del préstamo #'.$anterior->id.': monto '.AuditoriaService::dinero($nuevoMonto)
+                    .', saldo descontado '.AuditoriaService::dinero($saldo).', entregado '.AuditoriaService::dinero($entregar)
+                    .', total a pagar '.AuditoriaService::dinero($nuevo->monto_total),
                 $nuevo->id, 'prestamo', $nuevo->id, null, null,
-                ['monto' => $nuevoMonto, 'saldo_descontado' => $saldo, 'entregado' => $entregar, 'renueva_a' => $anterior->id]);
+                ['monto' => $nuevoMonto, 'monto_total' => (float) $nuevo->monto_total, 'saldo_descontado' => $saldo, 'entregado' => $entregar, 'renueva_a' => $anterior->id]);
 
             return ['prestamo' => $nuevo, 'saldo' => $saldo, 'entregar' => $entregar];
         });

@@ -113,11 +113,6 @@ class PrestamoController extends Controller
             'fecha_inicio' => 'required|date',
         ]);
 
-        // El monto y la cuota deben cuadrar (la diferencia es solo el redondeo de la cuota)
-        if (abs((float) $data['monto'] - (float) $data['valor_cuota'] * (int) $data['num_cuotas']) > (int) $data['num_cuotas']) {
-            return back()->withErrors(['monto' => 'El monto no coincide con valor de la cuota × número de cuotas.'])->withInput();
-        }
-
         $r = $service->renovar($anterior, $data, $request->user()->id);
 
         $msg = 'Préstamo renovado: '.$r['prestamo']->num_cuotas.' cuotas de $'.number_format($r['prestamo']->valor_cuota, 0, ',', '.').'.';
