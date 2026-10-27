@@ -5,14 +5,14 @@
     @php $badge = ['pagada' => 'badge-soft-success', 'atrasada' => 'badge-soft-danger', 'parcial' => 'badge-soft-warning', 'pendiente' => 'badge-soft-secondary']; @endphp
 
     <div class="row g-2 mb-3">
-        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Saldo</div><div class="value">${{ number_format($prestamo->saldo_calc, 0, ',', '.') }}</div></div></div>
-        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Atrasado</div><div class="value text-danger">${{ number_format($prestamo->atrasado_calc, 0, ',', '.') }}</div></div></div>
-        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Total préstamo</div><div class="value">${{ number_format($prestamo->monto_total, 0, ',', '.') }}</div></div></div>
-        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Cuota</div><div class="value">${{ number_format($prestamo->valor_cuota, 0, ',', '.') }}</div></div></div>
+        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Saldo</div><div class="value">${{ number_format($prestamo->saldo_calc, 0, '', '') }}</div></div></div>
+        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Atrasado</div><div class="value text-danger">${{ number_format($prestamo->atrasado_calc, 0, '', '') }}</div></div></div>
+        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Total préstamo</div><div class="value">${{ number_format($prestamo->monto_total, 0, '', '') }}</div></div></div>
+        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Cuota</div><div class="value">${{ number_format($prestamo->valor_cuota, 0, '', '') }}</div></div></div>
     </div>
 
     <div class="card card-soft mb-3"><div class="card-body small">
-        <div>@if ((float) $prestamo->monto !== (float) $prestamo->monto_total)<strong>Prestado:</strong> ${{ number_format($prestamo->monto, 0, ',', '.') }} · @endif<strong>Debe:</strong> ${{ number_format($prestamo->monto_total, 0, ',', '.') }} = {{ $prestamo->num_cuotas }} cuotas de ${{ number_format($prestamo->valor_cuota, 0, ',', '.') }} {{ $prestamo->frecuencia }}s desde {{ $prestamo->fecha_inicio->format('d/m/Y') }}</div>
+        <div>@if ((float) $prestamo->monto !== (float) $prestamo->monto_total)<strong>Prestado:</strong> ${{ number_format($prestamo->monto, 0, '', '') }} · @endif<strong>Debe:</strong> ${{ number_format($prestamo->monto_total, 0, '', '') }} = {{ $prestamo->num_cuotas }} cuotas de ${{ number_format($prestamo->valor_cuota, 0, '', '') }} {{ $prestamo->frecuencia }}s desde {{ $prestamo->fecha_inicio->format('d/m/Y') }}</div>
         <div><strong>Calificación del cliente:</strong> @include('partials.calificacion', ['cal' => $cal])
             @if ($cal['atrasadas'] > 0)<span class="text-danger">· {{ $cal['atrasadas'] }} cuota(s) atrasada(s), la más vieja hace {{ $cal['dias_max'] }} día(s)</span>@endif</div>
         @if ($prestamo->renovado_de_id)<div><strong>Renovación del préstamo</strong> <a href="{{ route('prestamos.show', $prestamo->renovado_de_id) }}">#{{ $prestamo->renovado_de_id }}</a></div>@endif
@@ -43,7 +43,7 @@
             <div class="modal-body">
                 <p class="small text-secondary">Se crea un préstamo nuevo para {{ $prestamo->cliente->nombre_completo }} con las mismas condiciones ({{ $prestamo->frecuencia }}{{ $prestamo->saltar_domingos ? ', sin domingos' : '' }}{{ $prestamo->saltar_festivos ? ', sin festivos' : '' }}). Puedes ajustar los valores.</p>
                 @if ($prestamo->saldo_calc > 0)
-                    <div class="alert alert-warning py-2 small">Este préstamo aún tiene <strong>${{ number_format($prestamo->saldo_calc, 0, ',', '.') }}</strong> pendientes. Se descuentan del nuevo préstamo y al cliente se le entrega la diferencia.</div>
+                    <div class="alert alert-warning py-2 small">Este préstamo aún tiene <strong>${{ number_format($prestamo->saldo_calc, 0, '', '') }}</strong> pendientes. Se descuentan del nuevo préstamo y al cliente se le entrega la diferencia.</div>
                 @endif
                 <div class="row g-2">
                     <div class="col-12"><label class="form-label fw-semibold">Monto a prestar</label>
@@ -111,8 +111,8 @@
                         </form>
                     @else {{ $c->fecha->format('d/m/Y') }} @endif
                 </td>
-                <td class="text-end">${{ number_format($c->valor, 0, ',', '.') }}</td>
-                <td class="text-end">${{ number_format($c->pagado, 0, ',', '.') }}</td>
+                <td class="text-end">${{ number_format($c->valor, 0, '', '') }}</td>
+                <td class="text-end">${{ number_format($c->pagado, 0, '', '') }}</td>
                 <td><span class="badge {{ $badge[$c->estado_visual] }}">{{ ucfirst($c->estado_visual) }}</span></td>
             </tr>
         @endforeach
@@ -123,11 +123,11 @@
     <div class="card card-soft"><div class="card-body">
         @forelse ($prestamo->pagos->sortByDesc('id') as $pg)
             <div class="d-flex justify-content-between align-items-center py-2 {{ ! $loop->last ? 'border-bottom' : '' }}">
-                <div><strong>${{ number_format($pg->valor, 0, ',', '.') }}</strong>
+                <div><strong>${{ number_format($pg->valor, 0, '', '') }}</strong>
                     <div class="small text-secondary">{{ $pg->fecha->format('d/m/Y') }} · {{ $pg->created_at->format('h:i a') }} · {{ $pg->user->name }}{{ $pg->nota ? ' · '.$pg->nota : '' }}</div>
                     @if ($pg->renovacion)<span class="badge badge-soft-primary"><i class="bi bi-arrow-repeat"></i> Renovación (sin efectivo)</span>@endif</div>
                 @if ($prestamo->estado !== 'anulado' && ! $pg->renovacion)
-                    <form method="POST" action="{{ route('pagos.destroy', $pg) }}" data-motivo="¿Por qué deshaces este pago de ${{ number_format($pg->valor, 0, ',', '.') }}?">
+                    <form method="POST" action="{{ route('pagos.destroy', $pg) }}" data-motivo="¿Por qué deshaces este pago de ${{ number_format($pg->valor, 0, '', '') }}?">
                         @csrf @method('DELETE') <button class="btn btn-sm btn-outline-danger rounded-pill">Deshacer</button>
                     </form>
                 @endif

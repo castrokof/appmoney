@@ -9,7 +9,7 @@ class AuditoriaService
     /** Formato $1.234 para los resúmenes. */
     public static function dinero(float|int|string $v): string
     {
-        return '$'.number_format((float) $v, 0, ',', '.');
+        return '$'.number_format((float) $v, 0, '', '');
     }
 
     /**

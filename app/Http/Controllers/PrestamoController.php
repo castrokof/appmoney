@@ -115,9 +115,9 @@ class PrestamoController extends Controller
 
         $r = $service->renovar($anterior, $data, $request->user()->id);
 
-        $msg = 'Préstamo renovado: '.$r['prestamo']->num_cuotas.' cuotas de $'.number_format($r['prestamo']->valor_cuota, 0, ',', '.').'.';
+        $msg = 'Préstamo renovado: '.$r['prestamo']->num_cuotas.' cuotas de $'.number_format($r['prestamo']->valor_cuota, 0, '', '').'.';
         if ($r['saldo'] > 0) {
-            $msg .= ' Saldo anterior descontado: $'.number_format($r['saldo'], 0, ',', '.').'. Entregar al cliente: $'.number_format($r['entregar'], 0, ',', '.').'.';
+            $msg .= ' Saldo anterior descontado: $'.number_format($r['saldo'], 0, '', '').'. Entregar al cliente: $'.number_format($r['entregar'], 0, '', '').'.';
         }
 
         return redirect()->route('prestamos.show', $r['prestamo']->id)->with('ok', $msg);

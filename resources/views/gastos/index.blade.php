@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('title', 'Gastos')
-@section('subtitle', 'Total del mes: $'.number_format($total, 0, ',', '.'))
+@section('subtitle', 'Total del mes: $'.number_format($total, 0, '', ''))
 @section('content')
     <div class="d-flex gap-2 mb-3">
         <form method="GET" class="flex-grow-1">
@@ -16,7 +16,7 @@
                 <div class="small text-secondary">{{ $g->fecha->format('d/m/Y') }}@if(auth()->user()->esGestor()) · {{ $g->user->name }}@endif</div>
             </div>
             <div class="text-end">
-                <div class="fs-5 fw-bolder text-danger">-${{ number_format($g->monto, 0, ',', '.') }}</div>
+                <div class="fs-5 fw-bolder text-danger">-${{ number_format($g->monto, 0, '', '') }}</div>
                 @if ($g->user_id === auth()->id() || auth()->user()->esGestor())
                     <button class="btn btn-sm btn-outline-secondary rounded-circle"
                         data-gasto="{{ json_encode(['id' => $g->id, 'monto' => (float) $g->monto, 'descripcion' => $g->descripcion, 'fecha' => $g->fecha->toDateString()]) }}" onclick="editarGasto(JSON.parse(this.dataset.gasto))"><i class="bi bi-pencil"></i></button>
@@ -42,7 +42,7 @@
                 <input name="descripcion" id="gDesc" maxlength="150" class="form-control" required>
                 <label class="form-label fw-semibold mt-3">Fecha</label>
                 <input name="fecha" id="gFecha" type="date" class="form-control">
-                @if ($cajaActual !== null)<div class="small text-secondary mt-2">Tu caja actual: ${{ number_format($cajaActual, 0, ',', '.') }}</div>@endif
+                @if ($cajaActual !== null)<div class="small text-secondary mt-2">Tu caja actual: ${{ number_format($cajaActual, 0, '', '') }}</div>@endif
             </div>
             <div class="modal-footer border-0 pt-0"><button class="btn btn-primary btn-lg w-100 fw-bold">Guardar</button></div>
         </form>

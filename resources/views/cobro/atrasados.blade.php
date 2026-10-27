@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('title', 'Atrasados')
-@section('subtitle', '$'.number_format($totalAtrasado, 0, ',', '.').' en atraso')
+@section('subtitle', '$'.number_format($totalAtrasado, 0, '', '').' en atraso')
 @section('content')
     <form class="mb-3" method="GET">
         <div class="input-group input-group-lg">
@@ -20,7 +20,7 @@
                     @include('partials.cuota-actual', ['p' => $p])
                 </div>
                 <div class="text-end">
-                    <div class="fs-5 fw-bolder text-danger">${{ number_format($p->atrasado_calc, 0, ',', '.') }}</div>
+                    <div class="fs-5 fw-bolder text-danger">${{ number_format($p->atrasado_calc, 0, '', '') }}</div>
                     <button class="btn btn-sm btn-success rounded-pill"
                         onclick="abrirPago({{ $p->id }}, @js($c->nombre_completo), {{ $p->atrasado_calc }}, {{ $p->saldo_calc }})">Cobrar</button>
                     <a class="btn btn-sm btn-outline-primary rounded-pill" href="{{ route('prestamos.show', $p->id) }}">Ver</a>

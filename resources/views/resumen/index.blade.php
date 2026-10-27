@@ -9,10 +9,10 @@
     </div></form>
 
     <div class="row g-2 mb-3">
-        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Cobrado (período)</div><div class="value text-success">${{ number_format($cobradoPeriodo, 0, ',', '.') }}</div></div></div>
-        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Gastos (período)</div><div class="value text-danger">${{ number_format($gastosPeriodo, 0, ',', '.') }}</div></div></div>
-        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Total en la calle</div><div class="value text-primary">${{ number_format($enLaCalle, 0, ',', '.') }}</div></div></div>
-        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Total atrasado</div><div class="value text-danger">${{ number_format($atrasado, 0, ',', '.') }}</div></div></div>
+        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Cobrado (período)</div><div class="value text-success">${{ number_format($cobradoPeriodo, 0, '', '') }}</div></div></div>
+        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Gastos (período)</div><div class="value text-danger">${{ number_format($gastosPeriodo, 0, '', '') }}</div></div></div>
+        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Total en la calle</div><div class="value text-primary">${{ number_format($enLaCalle, 0, '', '') }}</div></div></div>
+        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Total atrasado</div><div class="value text-danger">${{ number_format($atrasado, 0, '', '') }}</div></div></div>
     </div>
 
     <h2 class="h6 fw-bold text-uppercase text-secondary mt-4">Por cobrador</h2>
@@ -20,10 +20,10 @@
         <thead><tr><th>Cobrador</th><th class="text-end">Cobrado</th><th class="text-end">Prestado</th><th class="text-end">Gastos</th>@if (config('cobros.usar_base'))<th class="text-end">Caja</th>@endif</tr></thead>
         <tbody>@foreach ($cobradoresRows as $r)
             <tr><td>{{ $r['usuario']->name }}</td>
-                <td class="text-end">${{ number_format($r['cobrado_periodo'], 0, ',', '.') }}</td>
-                <td class="text-end">${{ number_format($r['prestado'], 0, ',', '.') }}</td>
-                <td class="text-end">${{ number_format($r['gastos'], 0, ',', '.') }}</td>
-                @if (config('cobros.usar_base'))<td class="text-end fw-bold {{ $r['caja'] < 0 ? 'text-danger' : '' }}">${{ number_format($r['caja'], 0, ',', '.') }}</td>@endif</tr>
+                <td class="text-end">${{ number_format($r['cobrado_periodo'], 0, '', '') }}</td>
+                <td class="text-end">${{ number_format($r['prestado'], 0, '', '') }}</td>
+                <td class="text-end">${{ number_format($r['gastos'], 0, '', '') }}</td>
+                @if (config('cobros.usar_base'))<td class="text-end fw-bold {{ $r['caja'] < 0 ? 'text-danger' : '' }}">${{ number_format($r['caja'], 0, '', '') }}</td>@endif</tr>
         @endforeach</tbody>
     </table></div></div>
 
@@ -32,7 +32,7 @@
         @forelse ($porDia as $d)
             <div class="d-flex justify-content-between py-1">
                 <span>{{ \Carbon\Carbon::parse($d->fecha)->translatedFormat('D d M') }} <small class="text-secondary">· {{ $d->pagos }} pago(s)</small></span>
-                <strong>${{ number_format($d->total, 0, ',', '.') }}</strong>
+                <strong>${{ number_format($d->total, 0, '', '') }}</strong>
             </div>
         @empty
             <div class="text-center text-secondary">Sin cobros en el período.</div>

@@ -2,12 +2,12 @@
 @section('title', 'Cobro de hoy')
 @section('content')
     <div class="row g-2 mb-3">
-        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Por cobrar hoy</div><div class="value text-primary">${{ number_format($porCobrar, 0, ',', '.') }}</div></div></div>
-        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Cobrado hoy</div><div class="value text-success">${{ number_format($cobradoHoy, 0, ',', '.') }}</div></div></div>
+        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Por cobrar hoy</div><div class="value text-primary">${{ number_format($porCobrar, 0, '', '') }}</div></div></div>
+        <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Cobrado hoy</div><div class="value text-success">${{ number_format($cobradoHoy, 0, '', '') }}</div></div></div>
         @if ($cajaTotal !== null)
-            <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Caja disponible</div><div class="value {{ $cajaTotal < 0 ? 'text-danger' : '' }}">${{ number_format($cajaTotal, 0, ',', '.') }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Caja disponible</div><div class="value {{ $cajaTotal < 0 ? 'text-danger' : '' }}">${{ number_format($cajaTotal, 0, '', '') }}</div></div></div>
         @else
-            <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Atrasado</div><div class="value text-danger">${{ number_format($atrasadoTotal, 0, ',', '.') }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Atrasado</div><div class="value text-danger">${{ number_format($atrasadoTotal, 0, '', '') }}</div></div></div>
         @endif
         <div class="col-6 col-md-3"><div class="card card-soft stat"><div class="label">Clientes a visitar</div><div class="value">{{ $prestamos->count() }}</div></div></div>
     </div>
@@ -31,9 +31,9 @@
                         @include('partials.cuota-actual', ['p' => $p])
                     </div>
                     <div class="text-end">
-                        <div class="fs-5 fw-bolder text-primary">${{ number_format($p->hoy_calc, 0, ',', '.') }}</div>
+                        <div class="fs-5 fw-bolder text-primary">${{ number_format($p->hoy_calc, 0, '', '') }}</div>
                         @if ($p->cuotas_atrasadas_calc > 0)
-                            <span class="badge badge-soft-danger">{{ $p->cuotas_atrasadas_calc }} atrasada(s) · ${{ number_format($p->atrasado_calc, 0, ',', '.') }}</span>
+                            <span class="badge badge-soft-danger">{{ $p->cuotas_atrasadas_calc }} atrasada(s) · ${{ number_format($p->atrasado_calc, 0, '', '') }}</span>
                         @endif
                     </div>
                 </div>

@@ -18,14 +18,14 @@
             <div class="card card-soft mb-2"><div class="card-body d-flex justify-content-between align-items-center">
                 <div>
                     <div class="fw-bold">{{ $p->cliente->nombre_completo }} @include('partials.calificacion', ['cal' => $cals[$p->cliente_id] ?? null])</div>
-                    <div class="small text-secondary">Préstamo #{{ $p->id }} · ${{ number_format($p->valor_cuota, 0, ',', '.') }} {{ $p->frecuencia }}</div>
+                    <div class="small text-secondary">Préstamo #{{ $p->id }} · ${{ number_format($p->valor_cuota, 0, '', '') }} {{ $p->frecuencia }}</div>
                     @include('partials.cuota-actual', ['p' => $p])
                     <span class="badge {{ ['activo' => 'badge-soft-success', 'pagado' => 'badge-soft-secondary', 'anulado' => 'badge-soft-danger'][$p->estado] }}">{{ ucfirst($p->estado) }}</span>
                     @if ($p->cuotas_atrasadas_calc > 0)<span class="badge badge-soft-danger">{{ $p->cuotas_atrasadas_calc }} atrasada(s)</span>@endif
                 </div>
                 <div class="text-end">
                     <div class="small text-secondary">Saldo</div>
-                    <div class="fs-5 fw-bolder">${{ number_format($p->saldo_calc, 0, ',', '.') }}</div>
+                    <div class="fs-5 fw-bolder">${{ number_format($p->saldo_calc, 0, '', '') }}</div>
                 </div>
             </div></div>
         </a>

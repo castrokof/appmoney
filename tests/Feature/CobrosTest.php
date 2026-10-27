@@ -632,7 +632,7 @@ class CobrosTest extends TestCase
         $this->assertSame(150000.0, (float) $nuevo->cuotas()->sum('valor'));
         $this->assertSame(150000.0, round($nuevo->fresh()->saldo, 2));
         $this->assertSame(36000.0, (float) $p->pagos()->where('renovacion', true)->sum('valor'));
-        $this->assertStringContainsString('64.000', session('ok'));
+        $this->assertStringContainsString('$64000', session('ok'));
 
         $this->actingAs($u)->get(route('prestamos.show', $nuevo->id))->assertOk()
             ->assertSee('Prestado:')->assertSee('Debe:');

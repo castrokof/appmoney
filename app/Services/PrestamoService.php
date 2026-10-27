@@ -41,7 +41,7 @@ class PrestamoService
 
             if ($monto > $disponible) {
                 throw ValidationException::withMessages([
-                    'valor_cuota' => 'Base insuficiente: disponible $'.number_format($disponible, 0, ',', '.'),
+                    'valor_cuota' => 'Base insuficiente: disponible $'.number_format($disponible, 0, '', ''),
                 ]);
             }
         }
@@ -134,7 +134,7 @@ class PrestamoService
 
             if ($nuevoMonto < $saldo) {
                 throw ValidationException::withMessages([
-                    'valor_cuota' => 'El nuevo préstamo ($'.number_format($nuevoMonto, 0, ',', '.').') debe cubrir el saldo pendiente ($'.number_format($saldo, 0, ',', '.').').',
+                    'valor_cuota' => 'El nuevo préstamo ($'.number_format($nuevoMonto, 0, '', '').') debe cubrir el saldo pendiente ($'.number_format($saldo, 0, '', '').').',
                 ]);
             }
 

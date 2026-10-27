@@ -10,13 +10,13 @@
         <div class="card card-soft mb-2"><div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <div class="fw-bold">{{ $f['usuario']->name }}</div>
-                <div class="fs-4 fw-bolder {{ $f['caja'] < 0 ? 'text-danger' : 'text-success' }}">${{ number_format($f['caja'], 0, ',', '.') }}</div>
+                <div class="fs-4 fw-bolder {{ $f['caja'] < 0 ? 'text-danger' : 'text-success' }}">${{ number_format($f['caja'], 0, '', '') }}</div>
             </div>
             <div class="row small text-secondary text-center g-1">
-                <div class="col-3">Base<br><strong class="text-dark">${{ number_format($f['base'], 0, ',', '.') }}</strong></div>
-                <div class="col-3">Cobrado<br><strong class="text-dark">${{ number_format($f['cobrado'], 0, ',', '.') }}</strong></div>
-                <div class="col-3">Prestado<br><strong class="text-dark">${{ number_format($f['prestado'], 0, ',', '.') }}</strong></div>
-                <div class="col-3">Gastos<br><strong class="text-dark">${{ number_format($f['gastos'], 0, ',', '.') }}</strong></div>
+                <div class="col-3">Base<br><strong class="text-dark">${{ number_format($f['base'], 0, '', '') }}</strong></div>
+                <div class="col-3">Cobrado<br><strong class="text-dark">${{ number_format($f['cobrado'], 0, '', '') }}</strong></div>
+                <div class="col-3">Prestado<br><strong class="text-dark">${{ number_format($f['prestado'], 0, '', '') }}</strong></div>
+                <div class="col-3">Gastos<br><strong class="text-dark">${{ number_format($f['gastos'], 0, '', '') }}</strong></div>
             </div>
         </div></div>
     @endforeach
@@ -27,7 +27,7 @@
             <div class="d-flex justify-content-between py-2 {{ ! $loop->last ? 'border-bottom' : '' }}">
                 <div><strong>{{ $b->user->name }}</strong>
                     <div class="small text-secondary">{{ $b->fecha->format('d/m/Y') }} · por {{ $b->creador->name }}{{ $b->nota ? ' · '.$b->nota : '' }}</div></div>
-                <strong class="{{ $b->monto < 0 ? 'text-danger' : 'text-success' }}">{{ $b->monto < 0 ? '-' : '+' }}${{ number_format(abs($b->monto), 0, ',', '.') }}</strong>
+                <strong class="{{ $b->monto < 0 ? 'text-danger' : 'text-success' }}">{{ $b->monto < 0 ? '-' : '+' }}${{ number_format(abs($b->monto), 0, '', '') }}</strong>
             </div>
         @empty
             <div class="text-center text-secondary">Aún no hay entregas de base.</div>

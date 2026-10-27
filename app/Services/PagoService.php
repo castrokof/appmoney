@@ -31,7 +31,7 @@ class PagoService
             }
             if ($valor > $saldo) {
                 throw ValidationException::withMessages([
-                    'valor' => 'El pago excede el saldo ($'.number_format($saldo, 0, ',', '.').').',
+                    'valor' => 'El pago excede el saldo ($'.number_format($saldo, 0, '', '').').',
                 ]);
             }
 
